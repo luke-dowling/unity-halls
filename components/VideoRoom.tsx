@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { signOut } from "next-auth/react"
 import DailyIframe, {
   DailyCall,
   DailyParticipant,
@@ -53,6 +54,7 @@ interface VideoRoomProps {
   roomStateRef?: React.MutableRefObject<{
     broadcastTheme: (themeId: string, theme: Theme) => void
   } | null>
+  devMode?: boolean
 }
 
 // Class → shadow color mapping
@@ -66,6 +68,93 @@ const CLASS_COLORS: Record<string, string> = {
 
 const DM_COLOR = "shadow-amber-500/60"
 
+const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
+  [
+    "dev-dm",
+    {
+      videoTrack: null,
+      audioTrack: null,
+      characterName: "The DM",
+      playerClass: undefined,
+      seatIndex: 0,
+      isDm: true,
+      isLocal: true,
+      isMuted: false,
+      isVideoOff: true,
+    },
+  ],
+  [
+    "dev-p1",
+    {
+      videoTrack: null,
+      audioTrack: null,
+      characterName: "Aelric",
+      playerClass: "CLERIC",
+      seatIndex: 1,
+      isDm: false,
+      isLocal: false,
+      isMuted: false,
+      isVideoOff: true,
+    },
+  ],
+  [
+    "dev-p2",
+    {
+      videoTrack: null,
+      audioTrack: null,
+      characterName: "Thornwick",
+      playerClass: "RANGER",
+      seatIndex: 2,
+      isDm: false,
+      isLocal: false,
+      isMuted: true,
+      isVideoOff: true,
+    },
+  ],
+  [
+    "dev-p3",
+    {
+      videoTrack: null,
+      audioTrack: null,
+      characterName: "Morgath",
+      playerClass: "BLOOD_HUNTER",
+      seatIndex: 3,
+      isDm: false,
+      isLocal: false,
+      isMuted: false,
+      isVideoOff: true,
+    },
+  ],
+  [
+    "dev-p4",
+    {
+      videoTrack: null,
+      audioTrack: null,
+      characterName: "Seraphina",
+      playerClass: "PALADIN",
+      seatIndex: 4,
+      isDm: false,
+      isLocal: false,
+      isMuted: false,
+      isVideoOff: true,
+    },
+  ],
+  [
+    "dev-p5",
+    {
+      videoTrack: null,
+      audioTrack: null,
+      characterName: "Zephyr",
+      playerClass: "SORCERER",
+      seatIndex: 5,
+      isDm: false,
+      isLocal: false,
+      isMuted: false,
+      isVideoOff: true,
+    },
+  ],
+]
+
 export default function VideoRoom({
   sessionCharacterName,
   sessionPortraitId,
@@ -76,6 +165,7 @@ export default function VideoRoom({
   onDmJoined,
   onLeave,
   roomStateRef,
+  devMode,
 }: VideoRoomProps) {
   const callRef = useRef<DailyCall | null>(null)
   const [participants, setParticipants] = useState<
@@ -142,16 +232,14 @@ export default function VideoRoom({
   })
 
   function toggleMic() {
-    if (!callRef.current) return
     const newState = !isMicOn
-    callRef.current.setLocalAudio(newState)
+    if (callRef.current) callRef.current.setLocalAudio(newState)
     setIsMicOn(newState)
   }
 
   function toggleCam() {
-    if (!callRef.current) return
     const newState = !isCamOn
-    callRef.current.setLocalVideo(newState)
+    if (callRef.current) callRef.current.setLocalVideo(newState)
     setIsCamOn(newState)
   }
 
@@ -161,11 +249,17 @@ export default function VideoRoom({
       callRef.current.destroy()
       callRef.current = null
     }
-    setStatus("left")
     onLeave?.()
+    signOut({ callbackUrl: "/login" })
   }
 
   useEffect(() => {
+    if (devMode) {
+      setStatus("joined")
+      if (isAdmin) onDmJoined?.()
+      return
+    }
+
     if (callRef.current) {
       callRef.current.destroy()
       callRef.current = null
@@ -336,7 +430,9 @@ export default function VideoRoom({
   }
 
   // Sort tiles: DM first (seat 0), then by seatIndex
-  const tiles = Array.from(participants.entries()).sort(([, a], [, b]) => {
+  const tiles = (
+    devMode ? DEV_MOCK_PARTICIPANTS : Array.from(participants.entries())
+  ).sort(([, a], [, b]) => {
     if (a.isDm) return -1
     if (b.isDm) return 1
     return (a.seatIndex ?? 99) - (b.seatIndex ?? 99)
@@ -345,11 +441,11 @@ export default function VideoRoom({
   const totalTiles = tiles.length
 
   return (
-    <div className='flex flex-col h-full'>
+    <div className='flex flex-col h-full pb-[76px]'>
       {/* Circular layout (desktop) / Grid (mobile) */}
-      <div className='flex-1 flex items-center justify-center p-4'>
+      <div className='flex-1 flex items-center justify-center p-4 pt-18 lg:pt-10'>
         {/* Mobile grid */}
-        <div className='grid grid-cols-2 gap-3 lg:hidden w-full max-w-lg'>
+        <div className='grid grid-cols-2 gap-3 md:hidden w-full max-w-lg'>
           {tiles.map(([sid, meta]) => {
             const shadowClass = meta.isDm
               ? DM_COLOR
@@ -361,10 +457,11 @@ export default function VideoRoom({
                 audioTrack={meta.audioTrack}
                 portraitId={meta.portraitId}
                 characterName={meta.characterName}
+                playerClass={meta.playerClass}
+                isDm={meta.isDm}
                 isLocal={meta.isLocal}
                 isMuted={meta.isMuted}
                 isVideoOff={meta.isVideoOff}
-                circular
                 shadowClass={shadowClass}
               />
             )
@@ -373,8 +470,8 @@ export default function VideoRoom({
 
         {/* Desktop circular layout */}
         <div
-          className='hidden lg:block relative'
-          style={{ width: "min(80vh, 700px)", height: "min(80vh, 700px)" }}
+          className='hidden md:block relative'
+          style={{ width: "min(85vh, 1200px)", height: "min(65vh, 900px)" }}
         >
           {tiles.map(([sid, meta], index) => {
             const shadowClass = meta.isDm
@@ -383,24 +480,17 @@ export default function VideoRoom({
 
             // Position in circle: DM at top, others distributed evenly
             const angle = (index / totalTiles) * 2 * Math.PI - Math.PI / 2
-            const radius = 42 // % from center
+            const radius = 44 // % from center
             const cx = 50 + radius * Math.cos(angle)
             const cy = 50 + radius * Math.sin(angle)
-            // Tile size scales down as more people join
-            const tileSize = Math.max(
-              120,
-              Math.min(160, 700 / (totalTiles + 1)),
-            )
 
             return (
               <div
                 key={sid}
-                className='absolute transform -translate-x-1/2 -translate-y-1/2'
+                className='absolute transform -translate-x-1/2 -translate-y-1/2 w-56 h-20 '
                 style={{
                   left: `${cx}%`,
                   top: `${cy}%`,
-                  width: `${tileSize}px`,
-                  height: `${tileSize}px`,
                 }}
               >
                 <VideoTile
@@ -408,10 +498,11 @@ export default function VideoRoom({
                   audioTrack={meta.audioTrack}
                   portraitId={meta.portraitId}
                   characterName={meta.characterName}
+                  playerClass={meta.playerClass}
+                  isDm={meta.isDm}
                   isLocal={meta.isLocal}
                   isMuted={meta.isMuted}
                   isVideoOff={meta.isVideoOff}
-                  circular
                   shadowClass={shadowClass}
                 />
               </div>
@@ -421,7 +512,7 @@ export default function VideoRoom({
       </div>
 
       {/* Bottom controls bar */}
-      <div className='sticky bottom-0 flex items-center justify-center gap-4 py-3 bg-stone-950/90 backdrop-blur-sm border-t border-stone-800/50'>
+      <div className='fixed bottom-0 left-0 right-0 z-30 flex items-center justify-center gap-4 py-4 bg-stone-950/90 backdrop-blur-sm border-t border-stone-800/50'>
         {/* Mic toggle */}
         <button
           onClick={toggleMic}

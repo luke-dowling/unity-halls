@@ -16,7 +16,10 @@ export default async function RoomPage() {
 
   const themes = await prisma.theme.findMany({ orderBy: { name: "asc" } })
 
+  console.log(session.user.role)
   const isAdmin = session.user.role === "DM"
+
+  const devMode = process.env.NODE_ENV === "development"
 
   return (
     <RoomClient
@@ -31,6 +34,7 @@ export default async function RoomPage() {
       initialTheme={roomState.theme}
       initialIsLive={roomState.isLive}
       themes={themes}
+      devMode={devMode}
     />
   )
 }

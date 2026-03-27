@@ -23,12 +23,26 @@ interface DmControlsProps {
   themes: Theme[]
   currentThemeId: string
   onThemeSelect: (themeId: string) => void
+  isPlaying: boolean
+  onPlayPause: () => void
+  onNextTrack: () => void
+  volume: number
+  onVolumeChange: (volume: number) => void
+  currentTrackIndex: number
+  totalTracks: number
 }
 
 export default function DmControls({
   themes,
   currentThemeId,
   onThemeSelect,
+  isPlaying,
+  onPlayPause,
+  onNextTrack,
+  volume,
+  onVolumeChange,
+  currentTrackIndex,
+  totalTracks,
 }: DmControlsProps) {
   const [broadcasting, setBroadcasting] = useState(false)
   const [sent, setSent] = useState(false)
@@ -73,6 +87,170 @@ export default function DmControls({
               <span>{theme.name}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Audio controls */}
+      <div className='space-y-2'>
+        <label className='block text-xs uppercase tracking-wider text-stone-400'>
+          Music
+        </label>
+
+        <div className='flex items-center gap-2'>
+          {/* Play / Pause */}
+          <button
+            type='button'
+            onClick={onPlayPause}
+            disabled={totalTracks === 0}
+            className='p-2 rounded-lg border border-stone-700 text-stone-300 hover:border-stone-500 hover:bg-stone-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed'
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? (
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='w-4 h-4'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  d='M10 9v6m4-6v6'
+                />
+              </svg>
+            ) : (
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='w-4 h-4'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  d='M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z'
+                />
+              </svg>
+            )}
+          </button>
+
+          {/* Next track */}
+          <button
+            type='button'
+            onClick={onNextTrack}
+            disabled={totalTracks <= 1}
+            className='p-2 rounded-lg border border-stone-700 text-stone-300 hover:border-stone-500 hover:bg-stone-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed'
+            title='Next track'
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='w-4 h-4'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                d='M9 5l7 7-7 7'
+              />
+              <path strokeLinecap='round' strokeLinejoin='round' d='M16 5v14' />
+            </svg>
+          </button>
+
+          {/* Track indicator */}
+          {totalTracks > 0 && (
+            <span className='text-xs text-stone-500 ml-1'>
+              {currentTrackIndex + 1}/{totalTracks}
+            </span>
+          )}
+        </div>
+
+        {/* Volume slider */}
+        <div className='flex items-center gap-2'>
+          <button
+            type='button'
+            onClick={() => onVolumeChange(0)}
+            className='text-stone-400 hover:text-stone-200 transition-colors'
+            title='Mute'
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='w-4 h-4'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+              strokeWidth={2}
+            >
+              {volume === 0 ? (
+                <>
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z'
+                  />
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2'
+                  />
+                </>
+              ) : (
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z'
+                />
+              )}
+            </svg>
+          </button>
+
+          <input
+            type='range'
+            min={0}
+            max={0.25}
+            step={0.01}
+            value={volume}
+            onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+            className='flex-1 h-1 accent-amber-500 bg-stone-700 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500'
+          />
+
+          {/* Percentage label */}
+          <span className='text-xs text-stone-500 w-8 text-right tabular-nums'>
+            {Math.round(volume * 400)}%
+          </span>
+
+          <button
+            type='button'
+            onClick={() => onVolumeChange(0.25)}
+            className='text-stone-400 hover:text-stone-200 transition-colors'
+            title='Max volume'
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='w-4 h-4'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z'
+              />
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                d='M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728'
+              />
+            </svg>
+          </button>
         </div>
       </div>
 

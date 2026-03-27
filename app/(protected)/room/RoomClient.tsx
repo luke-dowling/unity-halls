@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useEffect, useCallback } from "react"
+import { signOut } from "next-auth/react"
 import VideoRoom from "@/components/VideoRoom"
 import DmControls from "@/components/DmControls"
 import Image from "next/image"
@@ -24,6 +25,7 @@ interface RoomClientProps {
   initialTheme: Theme | null
   initialIsLive: boolean
   themes: Theme[]
+  devMode?: boolean
 }
 
 export default function RoomClient({
@@ -38,6 +40,7 @@ export default function RoomClient({
   initialTheme,
   initialIsLive,
   themes,
+  devMode,
 }: RoomClientProps) {
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(initialTheme)
   const [currentThemeId, setCurrentThemeId] = useState(initialThemeId)
@@ -45,12 +48,42 @@ export default function RoomClient({
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(true)
+  const [volume, setVolume] = useState(0.125)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   function handleTrackEnded() {
     if (!currentTheme?.musicUrls.length) return
     setCurrentTrackIndex((prev) => (prev + 1) % currentTheme.musicUrls.length)
   }
+
+  function handlePlayPause() {
+    const audio = audioRef.current
+    if (!audio) return
+    if (audio.paused) {
+      audio.play()
+      setIsPlaying(true)
+    } else {
+      audio.pause()
+      setIsPlaying(false)
+    }
+  }
+
+  function handleNextTrack() {
+    if (!currentTheme?.musicUrls.length) return
+    setCurrentTrackIndex((prev) => (prev + 1) % currentTheme.musicUrls.length)
+    setIsPlaying(true)
+  }
+
+  function handleVolumeChange(v: number) {
+    setVolume(v)
+    if (audioRef.current) audioRef.current.volume = v
+  }
+
+  // Keep audio element volume in sync
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume, currentTrackIndex, currentTheme])
 
   // Ref that VideoRoom populates so DmControls can call broadcastState
   const videoRoomApiRef = useRef<{
@@ -118,8 +151,8 @@ export default function RoomClient({
     setCurrentTrackIndex(0)
   }
 
-  // Waiting room for players when DM isn't live
-  if (!isAdmin && !isLive) {
+  // Waiting room for players when DM isn't live (skip in dev mode)
+  if (!devMode && !isAdmin && !isLive) {
     return (
       <main className='min-h-screen bg-stone-950 text-stone-100 flex flex-col items-center justify-center gap-6'>
         {sessionPortraitId && (
@@ -147,6 +180,12 @@ export default function RoomClient({
           <p className='text-stone-400 text-sm'>is waiting for DM…</p>
         </div>
         <div className='w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin' />
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className='mt-4 px-4 py-2 text-sm text-stone-400 hover:text-stone-100 border border-stone-700 hover:border-stone-500 rounded-lg transition-colors'
+        >
+          Log out
+        </button>
       </main>
     )
   }
@@ -205,6 +244,7 @@ export default function RoomClient({
             onDmJoined={handleDmJoined}
             onLeave={handleLeave}
             roomStateRef={videoRoomApiRef}
+            devMode={devMode}
           />
         </div>
       </div>
@@ -215,8 +255,10 @@ export default function RoomClient({
           ref={audioRef}
           key={`${currentTheme.id}-${currentTrackIndex}`}
           src={currentTheme.musicUrls[currentTrackIndex]}
-          autoPlay
+          autoPlay={isPlaying}
           onEnded={handleTrackEnded}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           className='hidden'
         />
       )}
@@ -273,6 +315,13 @@ export default function RoomClient({
                 themes={themes}
                 currentThemeId={currentThemeId}
                 onThemeSelect={handleThemeBroadcast}
+                isPlaying={isPlaying}
+                onPlayPause={handlePlayPause}
+                onNextTrack={handleNextTrack}
+                volume={volume}
+                onVolumeChange={handleVolumeChange}
+                currentTrackIndex={currentTrackIndex}
+                totalTracks={currentTheme?.musicUrls.length ?? 0}
               />
             </div>
           </aside>
