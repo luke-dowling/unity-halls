@@ -9,7 +9,7 @@ interface Theme {
   id: string
   name: string
   backgroundUrl: string
-  musicUrl: string
+  musicUrls: string[]
 }
 
 interface RoomClientProps {
@@ -43,6 +43,14 @@ export default function RoomClient({
   const [currentThemeId, setCurrentThemeId] = useState(initialThemeId)
   const [isLive, setIsLive] = useState(initialIsLive)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  function handleTrackEnded() {
+    if (!currentTheme?.musicUrls.length) return
+    setCurrentTrackIndex((prev) => (prev + 1) % currentTheme.musicUrls.length)
+  }
 
   // Ref that VideoRoom populates so DmControls can call broadcastState
   const videoRoomApiRef = useRef<{
@@ -101,11 +109,13 @@ export default function RoomClient({
     videoRoomApiRef.current?.broadcastTheme(themeId, theme)
     setCurrentThemeId(themeId)
     setCurrentTheme(theme)
+    setCurrentTrackIndex(0)
   }
 
   function handleThemeReceived(themeId: string, theme: Theme) {
     setCurrentThemeId(themeId)
     setCurrentTheme(theme)
+    setCurrentTrackIndex(0)
   }
 
   // Waiting room for players when DM isn't live
@@ -199,13 +209,14 @@ export default function RoomClient({
         </div>
       </div>
 
-      {/* Audio player for theme music */}
-      {currentTheme?.musicUrl && (
+      {/* Audio player — loops through theme music playlist */}
+      {currentTheme && currentTheme.musicUrls.length > 0 && (
         <audio
-          key={currentTheme.musicUrl}
-          src={currentTheme.musicUrl}
+          ref={audioRef}
+          key={`${currentTheme.id}-${currentTrackIndex}`}
+          src={currentTheme.musicUrls[currentTrackIndex]}
           autoPlay
-          loop
+          onEnded={handleTrackEnded}
           className='hidden'
         />
       )}

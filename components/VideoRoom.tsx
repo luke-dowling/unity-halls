@@ -12,7 +12,7 @@ interface Theme {
   id: string
   name: string
   backgroundUrl: string
-  musicUrl: string
+  musicUrls: string[]
 }
 
 interface ParticipantMeta {

@@ -15,7 +15,7 @@ export async function GET() {
 
   const state = await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", themeId: "tavern", isLive: false },
+    create: { id: "default", themeId: "world-map", isLive: false },
     update: {},
     include: { theme: true },
   });

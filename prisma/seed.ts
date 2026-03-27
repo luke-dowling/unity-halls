@@ -8,40 +8,46 @@ const prisma = new PrismaClient({ adapter });
 
 const THEMES = [
   {
+    id: "world-map",
+    name: "World Map",
+    backgroundUrl: "https://res.cloudinary.com/dkjzfvfws/image/upload/v1774598171/Parador_Second_Sundering_tdiumi.webp",
+    musicUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598042/450_Nightlands_xykuke.mp3"] as string[],
+  },
+  {
+    id: "dungeon",
+    name: "Dungeon",
+    backgroundUrl: "https://res.cloudinary.com/dkjzfvfws/image/upload/v1712649570/test190.jpg",
+    musicUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598262/442_Darkmoor_ancez0.mp3"] as string[],
+  },
+  {
     id: "forest",
     name: "Forest",
     backgroundUrl: "",
-    musicUrl: "",
+    musicUrls: [] as string[],
   },
   {
     id: "castle",
     name: "Castle",
     backgroundUrl: "",
-    musicUrl: "",
+    musicUrls: [] as string[],
   },
   {
     id: "battle",
     name: "Battle",
     backgroundUrl: "",
-    musicUrl: "",
+    musicUrls: [] as string[],
   },
   {
     id: "tavern",
     name: "Tavern",
     backgroundUrl: "",
-    musicUrl: "",
-  },
-  {
-    id: "dungeon",
-    name: "Dungeon",
-    backgroundUrl: "",
-    musicUrl: "",
+    musicUrls: [] as string[],
   },
   {
     id: "camp",
     name: "Camp",
     backgroundUrl: "",
-    musicUrl: "",
+    musicUrls: [] as string[],
   },
 ];
 
@@ -68,13 +74,13 @@ async function main() {
     await prisma.theme.upsert({
       where: { id: theme.id },
       create: theme,
-      update: { name: theme.name, backgroundUrl: theme.backgroundUrl, musicUrl: theme.musicUrl },
+      update: { name: theme.name, backgroundUrl: theme.backgroundUrl, musicUrls: theme.musicUrls },
     });
   }
 
   await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", themeId: "tavern", isLive: false },
+    create: { id: "default", themeId: "world-map", isLive: false },
     update: {},
   });
 

@@ -37,7 +37,7 @@ model Theme {
   id             String      @id
   name           String
   backgroundUrl  String
-  musicUrl       String
+  musicUrls      String[]
   roomStates     RoomState[]
 }
 

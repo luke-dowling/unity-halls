@@ -6,7 +6,7 @@ interface Theme {
   id: string
   name: string
   backgroundUrl: string
-  musicUrl: string
+  musicUrls: string[]
 }
 
 const THEME_ICONS: Record<string, string> = {
@@ -16,6 +16,7 @@ const THEME_ICONS: Record<string, string> = {
   tavern: "🍺",
   dungeon: "🕯️",
   camp: "🏕️",
+  "world-map": "🗺️",
 }
 
 interface DmControlsProps {

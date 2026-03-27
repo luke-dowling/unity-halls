@@ -9,7 +9,7 @@ export default async function RoomPage() {
 
   const roomState = await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", themeId: "tavern", isLive: false },
+    create: { id: "default", themeId: "world-map", isLive: false },
     update: {},
     include: { theme: true },
   })
@@ -27,7 +27,7 @@ export default async function RoomPage() {
       sessionPlayerClass={session.user.playerClass}
       sessionSeatIndex={session.user.seatIndex}
       isAdmin={isAdmin}
-      initialThemeId={roomState.themeId ?? "tavern"}
+      initialThemeId={roomState.themeId ?? "world-map"}
       initialTheme={roomState.theme}
       initialIsLive={roomState.isLive}
       themes={themes}
