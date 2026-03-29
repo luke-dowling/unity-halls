@@ -20,6 +20,7 @@ interface UserFormProps {
     portraitId?: string
     playerClass?: string
     seatIndex?: number
+    shadowColor?: string
   }) => void
 }
 
@@ -31,6 +32,7 @@ export default function UserForm({ takenSeats, onCreated }: UserFormProps) {
     characterName: "",
     playerClass: "",
     seatIndex: "",
+    shadowColor: "#78716c",
   })
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -50,6 +52,7 @@ export default function UserForm({ takenSeats, onCreated }: UserFormProps) {
         characterName: form.characterName || undefined,
         playerClass: form.playerClass || undefined,
         seatIndex: form.seatIndex ? parseInt(form.seatIndex) : undefined,
+        shadowColor: form.shadowColor || undefined,
       }),
     })
 
@@ -63,6 +66,7 @@ export default function UserForm({ takenSeats, onCreated }: UserFormProps) {
         characterName: "",
         playerClass: "",
         seatIndex: "",
+        shadowColor: "#78716c",
       })
     } else {
       const data = await res.json()
@@ -172,6 +176,30 @@ export default function UserForm({ takenSeats, onCreated }: UserFormProps) {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Shadow color */}
+      <div className='space-y-1'>
+        <label
+          htmlFor='shadowColor'
+          className='block text-xs uppercase tracking-wider text-stone-400'
+        >
+          Shadow Color
+        </label>
+        <div className='flex items-center gap-2'>
+          <input
+            id='shadowColor'
+            type='color'
+            value={form.shadowColor}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, shadowColor: e.target.value }))
+            }
+            className='w-10 h-8 rounded border border-stone-600 bg-stone-800 cursor-pointer'
+          />
+          <span className='text-xs text-stone-400 font-mono'>
+            {form.shadowColor}
+          </span>
+        </div>
       </div>
 
       {error && (

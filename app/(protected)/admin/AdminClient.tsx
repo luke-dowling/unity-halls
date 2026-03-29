@@ -23,6 +23,7 @@ interface Player {
   portraitId?: string
   playerClass?: string
   seatIndex?: number
+  shadowColor?: string
   role?: string
 }
 

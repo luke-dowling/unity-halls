@@ -30,6 +30,10 @@ interface DmControlsProps {
   onVolumeChange: (volume: number) => void
   currentTrackIndex: number
   totalTracks: number
+  shadowColor: string
+  onShadowColorChange: (color: string) => void
+  onOpenPlayerManager: () => void
+  onOpenThemeManager: () => void
 }
 
 export default function DmControls({
@@ -43,7 +47,12 @@ export default function DmControls({
   onVolumeChange,
   currentTrackIndex,
   totalTracks,
+  shadowColor,
+  onShadowColorChange,
+  onOpenPlayerManager,
+  onOpenThemeManager,
 }: DmControlsProps) {
+  const [stagingColor, setStagingColor] = useState(shadowColor)
   const [broadcasting, setBroadcasting] = useState(false)
   const [sent, setSent] = useState(false)
 
@@ -261,6 +270,61 @@ export default function DmControls({
       {sent && (
         <p className='text-xs text-amber-400 text-center'>✓ Theme updated!</p>
       )}
+
+      {/* Management buttons */}
+      <div className='space-y-2'>
+        <label className='block text-xs uppercase tracking-wider text-stone-400'>
+          Management
+        </label>
+        <div className='grid grid-cols-2 gap-2'>
+          <button
+            type='button'
+            onClick={onOpenPlayerManager}
+            className='flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-stone-700 text-stone-300 text-sm hover:border-amber-700 hover:text-amber-300 transition-colors'
+          >
+            <span>👤</span> Players
+          </button>
+          <button
+            type='button'
+            onClick={onOpenThemeManager}
+            className='flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-stone-700 text-stone-300 text-sm hover:border-amber-700 hover:text-amber-300 transition-colors'
+          >
+            <span>🎭</span> Themes
+          </button>
+        </div>
+      </div>
+
+      {/* Shadow color picker */}
+      <div className='space-y-2'>
+        <label className='block text-xs uppercase tracking-wider text-stone-400'>
+          Your Shadow Color
+        </label>
+        <div className='flex items-center gap-3'>
+          <input
+            type='color'
+            value={stagingColor}
+            onChange={(e) => setStagingColor(e.target.value)}
+            className='w-10 h-8 rounded border border-stone-600 bg-stone-800 cursor-pointer'
+          />
+          <span className='text-xs text-stone-400 font-mono'>
+            {stagingColor}
+          </span>
+          <div
+            className='w-8 h-8 rounded-lg border border-stone-600'
+            style={{
+              boxShadow: `0 0 12px 3px ${stagingColor}99`,
+              backgroundColor: "#1c1917",
+            }}
+          />
+        </div>
+        <button
+          type='button'
+          onClick={() => onShadowColorChange(stagingColor)}
+          className='w-full mt-1 px-3 py-1.5 rounded-lg border border-amber-700 bg-amber-900/40 text-amber-300 text-sm font-medium hover:bg-amber-800/50 transition-colors'
+        >
+          Update Color
+        </button>
+      </div>
     </div>
   )
 }

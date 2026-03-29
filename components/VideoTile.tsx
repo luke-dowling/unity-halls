@@ -6,13 +6,14 @@ interface VideoTileProps {
   videoTrack: MediaStreamTrack | null
   audioTrack: MediaStreamTrack | null
   portraitId?: string
+  portraitUrl?: string
   characterName?: string
   playerClass?: string
   isDm?: boolean
   isLocal?: boolean
   isMuted?: boolean
   isVideoOff?: boolean
-  shadowClass?: string
+  shadowColor?: string
 }
 
 const CLASS_LABELS: Record<string, string> = {
@@ -27,13 +28,14 @@ export default function VideoTile({
   videoTrack,
   audioTrack,
   portraitId,
+  portraitUrl,
   characterName,
   playerClass,
   isDm = false,
   isLocal = false,
   isMuted = false,
   isVideoOff = false,
-  shadowClass = "shadow-stone-500/40",
+  shadowColor = "#78716c",
 }: VideoTileProps) {
   function attachVideo(el: HTMLVideoElement | null) {
     if (!el || !videoTrack) return
@@ -53,7 +55,8 @@ export default function VideoTile({
       <div className='relative w-full'>
         {/* Video frame — rectangular with rounded edges */}
         <div
-          className={`relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 shadow-lg ${shadowClass} bg-stone-900`}
+          className='relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 bg-stone-900'
+          style={{ boxShadow: `0 0 18px 4px ${shadowColor}99` }}
         >
           {/* Video */}
           {videoTrack && !isVideoOff ? (
@@ -93,6 +96,14 @@ export default function VideoTile({
             <div className='w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 text-sm font-bold font-serif'>
               DM
             </div>
+          ) : portraitUrl ? (
+            <Image
+              src={portraitUrl}
+              alt={characterName ?? "Player"}
+              width={56}
+              height={56}
+              className='object-cover w-full h-full'
+            />
           ) : portraitId ? (
             <Image
               src={`/portraits/${portraitId}`}

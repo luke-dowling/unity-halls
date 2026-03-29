@@ -29,6 +29,8 @@ model User {
   playerClass   PlayerClass?
   seatIndex     Int?         @unique
   portraitId    String?
+  portraitUrl   String?
+  shadowColor   String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }

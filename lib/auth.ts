@@ -38,8 +38,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           characterName: user.characterName ?? undefined,
           portraitId: user.portraitId ?? undefined,
+          portraitUrl: user.portraitUrl ?? undefined,
           playerClass: user.playerClass ?? undefined,
           seatIndex: user.seatIndex ?? undefined,
+          shadowColor: user.shadowColor ?? undefined,
         };
       },
     }),
@@ -51,8 +53,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = (user as { role?: string }).role;
         token.characterName = (user as { characterName?: string }).characterName;
         token.portraitId = (user as { portraitId?: string }).portraitId;
+        token.portraitUrl = (user as { portraitUrl?: string }).portraitUrl;
         token.playerClass = (user as { playerClass?: string }).playerClass;
         token.seatIndex = (user as { seatIndex?: number }).seatIndex;
+        token.shadowColor = (user as { shadowColor?: string }).shadowColor;
       }
       return token;
     },
@@ -61,8 +65,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role = (token.role as string) ?? "PLAYER";
       session.user.characterName = token.characterName as string | undefined;
       session.user.portraitId = token.portraitId as string | undefined;
+      session.user.portraitUrl = token.portraitUrl as string | undefined;
       session.user.playerClass = token.playerClass as string | undefined;
       session.user.seatIndex = token.seatIndex as number | undefined;
+      session.user.shadowColor = token.shadowColor as string | undefined;
       return session;
     },
   },
@@ -76,8 +82,10 @@ declare module "next-auth" {
     role?: string;
     characterName?: string;
     portraitId?: string;
+    portraitUrl?: string;
     playerClass?: string;
     seatIndex?: number;
+    shadowColor?: string;
   }
   interface Session {
     user: {
@@ -87,8 +95,10 @@ declare module "next-auth" {
       role: string;
       characterName?: string;
       portraitId?: string;
+      portraitUrl?: string;
       playerClass?: string;
       seatIndex?: number;
+      shadowColor?: string;
     };
   }
 }

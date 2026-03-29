@@ -20,10 +20,12 @@ interface ParticipantMeta {
   videoTrack: MediaStreamTrack | null
   audioTrack: MediaStreamTrack | null
   portraitId?: string
+  portraitUrl?: string
   characterName?: string
   playerClass?: string
   seatIndex?: number
   isDm?: boolean
+  shadowColor?: string
   isLocal: boolean
   isMuted: boolean
   isVideoOff: boolean
@@ -33,10 +35,12 @@ type AppMessage =
   | {
       type: "IDENTITY"
       portraitId?: string
+      portraitUrl?: string
       characterName?: string
       playerClass?: string
       seatIndex?: number
       isDm?: boolean
+      shadowColor?: string
     }
   | { type: "THEME_CHANGE"; themeId: string; theme: Theme }
 
@@ -44,8 +48,10 @@ interface VideoRoomProps {
   sessionEmail: string
   sessionCharacterName?: string
   sessionPortraitId?: string
+  sessionPortraitUrl?: string
   sessionPlayerClass?: string
   sessionSeatIndex?: number
+  sessionShadowColor?: string
   isAdmin: boolean
   currentTheme: Theme | null
   onThemeChange?: (themeId: string, theme: Theme) => void
@@ -57,16 +63,8 @@ interface VideoRoomProps {
   devMode?: boolean
 }
 
-// Class → shadow color mapping
-const CLASS_COLORS: Record<string, string> = {
-  CLERIC: "shadow-white/60",
-  RANGER: "shadow-green-500/60",
-  BLOOD_HUNTER: "shadow-red-600/60",
-  PALADIN: "shadow-yellow-400/60",
-  SORCERER: "shadow-purple-500/60",
-}
-
-const DM_COLOR = "shadow-amber-500/60"
+const DEFAULT_SHADOW = "#78716c"
+const DM_DEFAULT_SHADOW = "#f59e0b"
 
 const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
   [
@@ -81,6 +79,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
       isLocal: true,
       isMuted: false,
       isVideoOff: true,
+      shadowColor: "#f59e0b",
     },
   ],
   [
@@ -95,6 +94,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
       isLocal: false,
       isMuted: false,
       isVideoOff: true,
+      shadowColor: "#ffffff",
     },
   ],
   [
@@ -109,6 +109,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
       isLocal: false,
       isMuted: true,
       isVideoOff: true,
+      shadowColor: "#22c55e",
     },
   ],
   [
@@ -123,6 +124,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
       isLocal: false,
       isMuted: false,
       isVideoOff: true,
+      shadowColor: "#dc2626",
     },
   ],
   [
@@ -137,6 +139,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
       isLocal: false,
       isMuted: false,
       isVideoOff: true,
+      shadowColor: "#facc15",
     },
   ],
   [
@@ -151,6 +154,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
       isLocal: false,
       isMuted: false,
       isVideoOff: true,
+      shadowColor: "#a855f7",
     },
   ],
 ]
@@ -158,8 +162,10 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
 export default function VideoRoom({
   sessionCharacterName,
   sessionPortraitId,
+  sessionPortraitUrl,
   sessionPlayerClass,
   sessionSeatIndex,
+  sessionShadowColor,
   isAdmin,
   onThemeChange,
   onDmJoined,
@@ -183,17 +189,21 @@ export default function VideoRoom({
       call.sendAppMessage({
         type: "IDENTITY",
         portraitId: sessionPortraitId,
+        portraitUrl: sessionPortraitUrl,
         characterName: sessionCharacterName,
         playerClass: sessionPlayerClass,
         seatIndex: sessionSeatIndex,
         isDm: isAdmin,
+        shadowColor: sessionShadowColor,
       })
     },
     [
       sessionPortraitId,
+      sessionPortraitUrl,
       sessionCharacterName,
       sessionPlayerClass,
       sessionSeatIndex,
+      sessionShadowColor,
       isAdmin,
     ],
   )
@@ -216,10 +226,12 @@ export default function VideoRoom({
     videoTrack: p.tracks.video?.persistentTrack ?? null,
     audioTrack: p.tracks.audio?.persistentTrack ?? null,
     portraitId: isLocal ? sessionPortraitId : undefined,
+    portraitUrl: isLocal ? sessionPortraitUrl : undefined,
     characterName: isLocal ? sessionCharacterName : (p.user_name ?? undefined),
     playerClass: isLocal ? sessionPlayerClass : undefined,
     seatIndex: isLocal ? sessionSeatIndex : undefined,
     isDm: isLocal ? isAdmin : undefined,
+    shadowColor: isLocal ? sessionShadowColor : undefined,
     isLocal,
     isMuted:
       p.tracks.audio?.state === "off" ||
@@ -236,6 +248,21 @@ export default function VideoRoom({
     if (callRef.current) callRef.current.setLocalAudio(newState)
     setIsMicOn(newState)
   }
+
+  // Update local participant's shadow color immediately when prop changes
+  useEffect(() => {
+    setParticipants((prev) => {
+      const next = new Map(prev)
+      for (const [sid, meta] of next) {
+        if (meta.isLocal) {
+          next.set(sid, { ...meta, shadowColor: sessionShadowColor })
+          break
+        }
+      }
+      return next
+    })
+    if (callRef.current) broadcastIdentity(callRef.current)
+  }, [sessionShadowColor, broadcastIdentity])
 
   function toggleCam() {
     const newState = !isCamOn
@@ -256,6 +283,7 @@ export default function VideoRoom({
   useEffect(() => {
     if (devMode) {
       setStatus("joined")
+      setParticipants(new Map(DEV_MOCK_PARTICIPANTS))
       if (isAdmin) onDmJoined?.()
       return
     }
@@ -325,6 +353,7 @@ export default function VideoRoom({
               next.set(sid, {
                 ...buildParticipantMeta(p, p.local),
                 portraitId: existing?.portraitId,
+                portraitUrl: existing?.portraitUrl,
                 characterName: p.local
                   ? sessionCharacterName
                   : (existing?.characterName ?? p.user_name ?? undefined),
@@ -333,6 +362,9 @@ export default function VideoRoom({
                   : existing?.playerClass,
                 seatIndex: p.local ? sessionSeatIndex : existing?.seatIndex,
                 isDm: p.local ? isAdmin : existing?.isDm,
+                shadowColor: p.local
+                  ? sessionShadowColor
+                  : existing?.shadowColor,
               })
             }
             return next
@@ -359,10 +391,12 @@ export default function VideoRoom({
                 next.set(fromId, {
                   ...entry,
                   portraitId: msg.portraitId,
+                  portraitUrl: msg.portraitUrl,
                   characterName: msg.characterName,
                   playerClass: msg.playerClass,
                   seatIndex: msg.seatIndex,
                   isDm: msg.isDm,
+                  shadowColor: msg.shadowColor,
                 })
               }
               return next
@@ -430,9 +464,7 @@ export default function VideoRoom({
   }
 
   // Sort tiles: DM first (seat 0), then by seatIndex
-  const tiles = (
-    devMode ? DEV_MOCK_PARTICIPANTS : Array.from(participants.entries())
-  ).sort(([, a], [, b]) => {
+  const tiles = Array.from(participants.entries()).sort(([, a], [, b]) => {
     if (a.isDm) return -1
     if (b.isDm) return 1
     return (a.seatIndex ?? 99) - (b.seatIndex ?? 99)
@@ -447,22 +479,23 @@ export default function VideoRoom({
         {/* Mobile grid */}
         <div className='grid grid-cols-2 gap-3 md:hidden w-full max-w-lg'>
           {tiles.map(([sid, meta]) => {
-            const shadowClass = meta.isDm
-              ? DM_COLOR
-              : (CLASS_COLORS[meta.playerClass ?? ""] ?? "shadow-stone-500/40")
+            const color = meta.isDm
+              ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
+              : (meta.shadowColor ?? DEFAULT_SHADOW)
             return (
               <VideoTile
                 key={sid}
                 videoTrack={meta.videoTrack}
                 audioTrack={meta.audioTrack}
                 portraitId={meta.portraitId}
+                portraitUrl={meta.portraitUrl}
                 characterName={meta.characterName}
                 playerClass={meta.playerClass}
                 isDm={meta.isDm}
                 isLocal={meta.isLocal}
                 isMuted={meta.isMuted}
                 isVideoOff={meta.isVideoOff}
-                shadowClass={shadowClass}
+                shadowColor={color}
               />
             )
           })}
@@ -474,9 +507,9 @@ export default function VideoRoom({
           style={{ width: "min(85vh, 1200px)", height: "min(65vh, 900px)" }}
         >
           {tiles.map(([sid, meta], index) => {
-            const shadowClass = meta.isDm
-              ? DM_COLOR
-              : (CLASS_COLORS[meta.playerClass ?? ""] ?? "shadow-stone-500/40")
+            const color = meta.isDm
+              ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
+              : (meta.shadowColor ?? DEFAULT_SHADOW)
 
             // Position in circle: DM at top, others distributed evenly
             const angle = (index / totalTiles) * 2 * Math.PI - Math.PI / 2
@@ -497,13 +530,14 @@ export default function VideoRoom({
                   videoTrack={meta.videoTrack}
                   audioTrack={meta.audioTrack}
                   portraitId={meta.portraitId}
+                  portraitUrl={meta.portraitUrl}
                   characterName={meta.characterName}
                   playerClass={meta.playerClass}
                   isDm={meta.isDm}
                   isLocal={meta.isLocal}
                   isMuted={meta.isMuted}
                   isVideoOff={meta.isVideoOff}
-                  shadowClass={shadowClass}
+                  shadowColor={color}
                 />
               </div>
             )
