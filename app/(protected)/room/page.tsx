@@ -27,8 +27,10 @@ export default async function RoomPage() {
       sessionName={session.user.name}
       sessionCharacterName={session.user.characterName}
       sessionPortraitId={session.user.portraitId}
+      sessionPortraitUrl={session.user.portraitUrl}
       sessionPlayerClass={session.user.playerClass}
       sessionSeatIndex={session.user.seatIndex}
+      sessionShadowColor={session.user.shadowColor}
       isAdmin={isAdmin}
       initialThemeId={roomState.themeId ?? "world-map"}
       initialTheme={roomState.theme}

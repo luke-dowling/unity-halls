@@ -4,6 +4,9 @@ import { useRef, useState, useEffect, useCallback } from "react"
 import { signOut } from "next-auth/react"
 import VideoRoom from "@/components/VideoRoom"
 import DmControls from "@/components/DmControls"
+import PlayerControls from "@/components/PlayerControls"
+import PlayerManager from "@/components/PlayerManager"
+import ThemeManager from "@/components/ThemeManager"
 import Image from "next/image"
 
 interface Theme {
@@ -18,8 +21,10 @@ interface RoomClientProps {
   sessionName: string
   sessionCharacterName?: string
   sessionPortraitId?: string
+  sessionPortraitUrl?: string
   sessionPlayerClass?: string
   sessionSeatIndex?: number
+  sessionShadowColor?: string
   isAdmin: boolean
   initialThemeId: string
   initialTheme: Theme | null
@@ -33,8 +38,10 @@ export default function RoomClient({
   sessionName,
   sessionCharacterName,
   sessionPortraitId,
+  sessionPortraitUrl,
   sessionPlayerClass,
   sessionSeatIndex,
+  sessionShadowColor,
   isAdmin,
   initialThemeId,
   initialTheme,
@@ -46,11 +53,27 @@ export default function RoomClient({
   const [currentThemeId, setCurrentThemeId] = useState(initialThemeId)
   const [isLive, setIsLive] = useState(initialIsLive)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [dmShadowColor, setDmShadowColor] = useState(
+    sessionShadowColor ?? "#f59e0b",
+  )
+  const [playerShadowColor, setPlayerShadowColor] = useState(
+    sessionShadowColor ?? "#78716c",
+  )
+  const [playerName, setPlayerName] = useState(sessionName)
+  const [playerCharacterName, setPlayerCharacterName] = useState(
+    sessionCharacterName ?? "",
+  )
+  const [playerPortraitUrl, setPlayerPortraitUrl] = useState(
+    sessionPortraitUrl ?? "",
+  )
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const [volume, setVolume] = useState(0.125)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [showPlayerManager, setShowPlayerManager] = useState(false)
+  const [showThemeManager, setShowThemeManager] = useState(false)
+  const [themeList, setThemeList] = useState(themes)
 
   function handleTrackEnded() {
     if (!currentTheme?.musicUrls.length) return
@@ -130,7 +153,7 @@ export default function RoomClient({
   }, [isAdmin])
 
   async function handleThemeBroadcast(themeId: string) {
-    const theme = themes.find((t) => t.id === themeId)
+    const theme = themeList.find((t) => t.id === themeId)
     if (!theme) return
 
     await fetch("/api/room/state", {
@@ -234,10 +257,16 @@ export default function RoomClient({
         <div className='flex-1 relative'>
           <VideoRoom
             sessionEmail={sessionEmail}
-            sessionCharacterName={sessionCharacterName}
+            sessionCharacterName={
+              isAdmin ? sessionCharacterName : playerCharacterName || undefined
+            }
             sessionPortraitId={sessionPortraitId}
+            sessionPortraitUrl={
+              isAdmin ? sessionPortraitUrl : playerPortraitUrl || undefined
+            }
             sessionPlayerClass={sessionPlayerClass}
             sessionSeatIndex={sessionSeatIndex}
+            sessionShadowColor={isAdmin ? dmShadowColor : playerShadowColor}
             isAdmin={isAdmin}
             currentTheme={currentTheme}
             onThemeChange={handleThemeReceived}
@@ -312,7 +341,7 @@ export default function RoomClient({
           >
             <div className='p-4 pt-16'>
               <DmControls
-                themes={themes}
+                themes={themeList}
                 currentThemeId={currentThemeId}
                 onThemeSelect={handleThemeBroadcast}
                 isPlaying={isPlaying}
@@ -322,10 +351,96 @@ export default function RoomClient({
                 onVolumeChange={handleVolumeChange}
                 currentTrackIndex={currentTrackIndex}
                 totalTracks={currentTheme?.musicUrls.length ?? 0}
+                shadowColor={dmShadowColor}
+                onShadowColorChange={async (color) => {
+                  setDmShadowColor(color)
+                  await fetch("/api/users/shadow-color", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ shadowColor: color }),
+                  })
+                }}
+                onOpenPlayerManager={() => setShowPlayerManager(true)}
+                onOpenThemeManager={() => setShowThemeManager(true)}
               />
             </div>
           </aside>
         </>
+      )}
+
+      {/* Player sidebar toggle */}
+      {!isAdmin && (
+        <>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className='fixed top-16 right-4 z-50 bg-stone-900/90 border border-stone-700 rounded-lg p-2 text-stone-300 hover:text-amber-300 hover:bg-stone-800/90 transition-colors backdrop-blur-sm'
+            title='My Character'
+          >
+            {sidebarOpen ? (
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='w-5 h-5'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  d='M6 18L18 6M6 6l12 12'
+                />
+              </svg>
+            ) : (
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='w-5 h-5'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+                />
+              </svg>
+            )}
+          </button>
+
+          <aside
+            className={`fixed top-0 right-0 h-full w-72 bg-stone-950/95 border-l border-stone-800 backdrop-blur-sm z-40 transform transition-transform duration-300 ease-in-out overflow-y-auto ${
+              sidebarOpen ? "translate-x-0" : "translate-x-full"
+            }`}
+          >
+            <div className='p-4 pt-16'>
+              <PlayerControls
+                name={playerName}
+                characterName={playerCharacterName}
+                shadowColor={playerShadowColor}
+                portraitUrl={playerPortraitUrl}
+                onProfileUpdated={(profile) => {
+                  setPlayerName(profile.name)
+                  setPlayerCharacterName(profile.characterName)
+                  setPlayerShadowColor(profile.shadowColor)
+                  setPlayerPortraitUrl(profile.portraitUrl)
+                }}
+              />
+            </div>
+          </aside>
+        </>
+      )}
+
+      {showPlayerManager && (
+        <PlayerManager onClose={() => setShowPlayerManager(false)} />
+      )}
+
+      {showThemeManager && (
+        <ThemeManager
+          onClose={() => setShowThemeManager(false)}
+          onThemesChanged={setThemeList}
+        />
       )}
     </main>
   )
