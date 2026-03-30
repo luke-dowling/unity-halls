@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Unity Halls
+
+A video session manager for your home D&D games — with character portraits, customizable themes, and DM controls.
+
+Unity Halls lets a Dungeon Master host a video room where players join with their character portraits overlaid on their video feeds. The DM can swap background themes, manage players, and control the session — all from one dashboard.
+
+## Tech Stack
+
+- **Framework**: [Next.js](https://nextjs.org) 16 (App Router) with React 19
+- **Database**: PostgreSQL via [Prisma](https://www.prisma.io/) ORM
+- **Auth**: [NextAuth v5](https://authjs.dev/) (Credentials / JWT)
+- **Video**: [Daily.co](https://www.daily.co/) (up to 6 participants)
+- **Image Hosting**: [Cloudinary](https://cloudinary.com/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) v4
+
+## Prerequisites
+
+- **Node.js** 20+
+- **pnpm** (package manager)
+- **PostgreSQL** database
+- **Daily.co** account — for video rooms ([get an API key](https://dashboard.daily.co/))
+- **Cloudinary** account — for portrait uploads ([sign up](https://cloudinary.com/))
+
+## Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/unity_halls
+AUTH_SECRET=<random-secret-for-nextauth>
+
+DAILY_API_KEY=<your-daily-api-key>
+DAILY_ROOM_NAME=unity-halls
+
+CLOUDINARY_CLOUD_NAME=<your-cloud-name>
+CLOUDINARY_API_KEY=<your-api-key>
+CLOUDINARY_API_SECRET=<your-api-secret>
+
+ADMIN_EMAIL=<dm-email-for-seed>
+SEED_DM_PASSWORD=<dm-password-for-seed>
+
+DEV_MODE=true
+```
+
+| Variable             | Description                                                    |
+| -------------------- | -------------------------------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL connection string                                   |
+| `AUTH_SECRET`        | Random secret for NextAuth (`npx auth secret` to generate)     |
+| `DAILY_API_KEY`      | API key from your Daily.co dashboard                           |
+| `DAILY_ROOM_NAME`    | Name of the Daily room (defaults to `unity-halls`)             |
+| `CLOUDINARY_*`       | Cloudinary credentials for portrait uploads                    |
+| `ADMIN_EMAIL`        | Email for the DM account created by the seed script            |
+| `SEED_DM_PASSWORD`   | Password for the seeded DM account                             |
+| `DEV_MODE`           | Set to `true` to use mock participants instead of live cameras |
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Install dependencies
+pnpm install
+
+# Run database migrations
+pnpm db:migrate
+
+# Seed the database (creates default DM + player accounts)
+pnpm db:seed
+
+# Start the dev server
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to get started.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Command           | Description                    |
+| ----------------- | ------------------------------ |
+| `pnpm dev`        | Start the development server   |
+| `pnpm build`      | Build for production           |
+| `pnpm start`      | Run the production build       |
+| `pnpm db:migrate` | Run Prisma migrations          |
+| `pnpm db:seed`    | Seed the database              |
+| `pnpm db:studio`  | Open Prisma Studio (DB viewer) |
+| `pnpm lint`       | Run ESLint                     |
