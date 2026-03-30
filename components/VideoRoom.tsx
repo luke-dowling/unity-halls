@@ -283,7 +283,14 @@ export default function VideoRoom({
   useEffect(() => {
     if (devMode) {
       setStatus("joined")
-      setParticipants(new Map(DEV_MOCK_PARTICIPANTS))
+      const devMap = new Map(DEV_MOCK_PARTICIPANTS)
+      // Apply the session user's saved shadow color to the local participant
+      for (const [sid, meta] of devMap) {
+        if (meta.isLocal && sessionShadowColor) {
+          devMap.set(sid, { ...meta, shadowColor: sessionShadowColor })
+        }
+      }
+      setParticipants(devMap)
       if (isAdmin) onDmJoined?.()
       return
     }
@@ -475,9 +482,9 @@ export default function VideoRoom({
   return (
     <div className='flex flex-col h-full pb-[76px]'>
       {/* Circular layout (desktop) / Grid (mobile) */}
-      <div className='flex-1 flex items-center justify-center p-4 pt-18 lg:pt-10'>
+      <div className='flex-1 flex items-center justify-center p-4 pt-18 lg:pt-0'>
         {/* Mobile grid */}
-        <div className='grid grid-cols-2 gap-3 md:hidden w-full max-w-lg'>
+        <div className='grid grid-cols-2 gap-3 lg:hidden w-full max-w-lg'>
           {tiles.map(([sid, meta]) => {
             const color = meta.isDm
               ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
@@ -503,24 +510,25 @@ export default function VideoRoom({
 
         {/* Desktop circular layout */}
         <div
-          className='hidden md:block relative'
-          style={{ width: "min(85vh, 1200px)", height: "min(65vh, 900px)" }}
+          className='hidden lg:block relative'
+          style={{ width: "min(90vh, 1400px)", height: "min(75vh, 1000px)" }}
         >
           {tiles.map(([sid, meta], index) => {
             const color = meta.isDm
               ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
               : (meta.shadowColor ?? DEFAULT_SHADOW)
 
-            // Position in circle: DM at top, others distributed evenly
+            // Position in ellipse: DM at top, others distributed evenly
             const angle = (index / totalTiles) * 2 * Math.PI - Math.PI / 2
-            const radius = 44 // % from center
-            const cx = 50 + radius * Math.cos(angle)
-            const cy = 50 + radius * Math.sin(angle)
+            const radiusX = 46 // horizontal % from center
+            const radiusY = 36 // vertical % from center
+            const cx = 50 + radiusX * Math.cos(angle)
+            const cy = 50 + radiusY * Math.sin(angle)
 
             return (
               <div
                 key={sid}
-                className='absolute transform -translate-x-1/2 -translate-y-1/2 w-56 h-20 '
+                className='absolute transform -translate-x-1/2 -translate-y-1/2 w-72 h-28 '
                 style={{
                   left: `${cx}%`,
                   top: `${cy}%`,

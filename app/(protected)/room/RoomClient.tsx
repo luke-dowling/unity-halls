@@ -351,6 +351,8 @@ export default function RoomClient({
                 onVolumeChange={handleVolumeChange}
                 currentTrackIndex={currentTrackIndex}
                 totalTracks={currentTheme?.musicUrls.length ?? 0}
+                name={sessionName}
+                characterName={sessionCharacterName ?? ""}
                 shadowColor={dmShadowColor}
                 onShadowColorChange={async (color) => {
                   setDmShadowColor(color)
@@ -360,6 +362,7 @@ export default function RoomClient({
                     body: JSON.stringify({ shadowColor: color }),
                   })
                 }}
+                onProfileUpdated={() => {}}
                 onOpenPlayerManager={() => setShowPlayerManager(true)}
                 onOpenThemeManager={() => setShowThemeManager(true)}
               />

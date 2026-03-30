@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { signOut } from "next-auth/react"
 
 interface Theme {
   id: string
@@ -30,8 +31,11 @@ interface DmControlsProps {
   onVolumeChange: (volume: number) => void
   currentTrackIndex: number
   totalTracks: number
+  name: string
+  characterName: string
   shadowColor: string
   onShadowColorChange: (color: string) => void
+  onProfileUpdated: (profile: { name: string; characterName: string }) => void
   onOpenPlayerManager: () => void
   onOpenThemeManager: () => void
 }
@@ -47,11 +51,18 @@ export default function DmControls({
   onVolumeChange,
   currentTrackIndex,
   totalTracks,
+  name: initialName,
+  characterName: initialCharacterName,
   shadowColor,
   onShadowColorChange,
+  onProfileUpdated,
   onOpenPlayerManager,
   onOpenThemeManager,
 }: DmControlsProps) {
+  const [dmName, setDmName] = useState(initialName)
+  const [dmCharacterName, setDmCharacterName] = useState(initialCharacterName)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
   const [stagingColor, setStagingColor] = useState(shadowColor)
   const [broadcasting, setBroadcasting] = useState(false)
   const [sent, setSent] = useState(false)
@@ -294,6 +305,56 @@ export default function DmControls({
         </div>
       </div>
 
+      {/* DM Name & Title */}
+      <div className='space-y-2'>
+        <label className='block text-xs uppercase tracking-wider text-stone-400'>
+          Name
+        </label>
+        <input
+          type='text'
+          value={dmName}
+          onChange={(e) => setDmName(e.target.value)}
+          className='w-full bg-stone-800 border border-stone-600 rounded-lg px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500'
+        />
+      </div>
+      <div className='space-y-2'>
+        <label className='block text-xs uppercase tracking-wider text-stone-400'>
+          Title
+        </label>
+        <input
+          type='text'
+          value={dmCharacterName}
+          onChange={(e) => setDmCharacterName(e.target.value)}
+          className='w-full bg-stone-800 border border-stone-600 rounded-lg px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500'
+        />
+      </div>
+      <button
+        type='button'
+        disabled={savingProfile}
+        onClick={async () => {
+          setSavingProfile(true)
+          setProfileSaved(false)
+          await fetch("/api/users/profile", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: dmName,
+              characterName: dmCharacterName,
+            }),
+          })
+          onProfileUpdated({ name: dmName, characterName: dmCharacterName })
+          setSavingProfile(false)
+          setProfileSaved(true)
+          setTimeout(() => setProfileSaved(false), 2000)
+        }}
+        className='w-full px-3 py-1.5 rounded-lg border border-amber-700 bg-amber-900/40 text-amber-300 text-sm font-medium hover:bg-amber-800/50 transition-colors disabled:opacity-50'
+      >
+        {savingProfile ? "Saving…" : "Update Profile"}
+      </button>
+      {profileSaved && (
+        <p className='text-xs text-amber-400 text-center'>✓ Profile updated!</p>
+      )}
+
       {/* Shadow color picker */}
       <div className='space-y-2'>
         <label className='block text-xs uppercase tracking-wider text-stone-400'>
@@ -325,6 +386,15 @@ export default function DmControls({
           Update Color
         </button>
       </div>
+
+      {/* Logout */}
+      <button
+        type='button'
+        onClick={() => signOut({ callbackUrl: "/login" })}
+        className='w-full px-3 py-2 rounded-lg border border-red-800 bg-red-900/30 text-red-400 text-sm font-medium hover:bg-red-800/40 hover:text-red-300 transition-colors'
+      >
+        Logout
+      </button>
     </div>
   )
 }
