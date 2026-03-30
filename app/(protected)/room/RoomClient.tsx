@@ -56,6 +56,10 @@ export default function RoomClient({
   const [dmShadowColor, setDmShadowColor] = useState(
     sessionShadowColor ?? "#f59e0b",
   )
+  const [dmName, setDmName] = useState(sessionName)
+  const [dmCharacterName, setDmCharacterName] = useState(
+    sessionCharacterName ?? "",
+  )
   const [playerShadowColor, setPlayerShadowColor] = useState(
     sessionShadowColor ?? "#78716c",
   )
@@ -257,8 +261,11 @@ export default function RoomClient({
         <div className='flex-1 relative'>
           <VideoRoom
             sessionEmail={sessionEmail}
+            sessionName={isAdmin ? dmName : playerName}
             sessionCharacterName={
-              isAdmin ? sessionCharacterName : playerCharacterName || undefined
+              isAdmin
+                ? dmCharacterName || undefined
+                : playerCharacterName || undefined
             }
             sessionPortraitId={sessionPortraitId}
             sessionPortraitUrl={
@@ -362,7 +369,10 @@ export default function RoomClient({
                     body: JSON.stringify({ shadowColor: color }),
                   })
                 }}
-                onProfileUpdated={() => {}}
+                onProfileUpdated={(profile) => {
+                  setDmName(profile.name)
+                  setDmCharacterName(profile.characterName)
+                }}
                 onOpenPlayerManager={() => setShowPlayerManager(true)}
                 onOpenThemeManager={() => setShowThemeManager(true)}
               />

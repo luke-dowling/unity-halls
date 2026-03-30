@@ -5,6 +5,7 @@ import Image from "next/image"
 interface VideoTileProps {
   videoTrack: MediaStreamTrack | null
   audioTrack: MediaStreamTrack | null
+  name?: string
   portraitId?: string
   portraitUrl?: string
   characterName?: string
@@ -27,6 +28,7 @@ const CLASS_LABELS: Record<string, string> = {
 export default function VideoTile({
   videoTrack,
   audioTrack,
+  name,
   portraitId,
   portraitUrl,
   characterName,
@@ -91,29 +93,32 @@ export default function VideoTile({
         </div>
 
         {/* Portrait circle — bottom-right, overlapping outside the video frame */}
-        <div className='absolute -bottom-3 -right-4 w-14 h-14 rounded-full border-2 border-stone-700 bg-stone-900 overflow-hidden shadow-md z-30'>
+        <div
+          className='absolute -bottom-4 -right-5 lg:-bottom-4 lg:-right-5 w-20 h-20 rounded-full border-2 bg-stone-900 overflow-hidden shadow-md z-30'
+          style={{ borderColor: shadowColor }}
+        >
           {isDm ? (
-            <div className='w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 text-sm font-bold font-serif'>
+            <div className='w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 text-base font-bold font-serif'>
               DM
             </div>
           ) : portraitUrl ? (
             <Image
               src={portraitUrl}
               alt={characterName ?? "Player"}
-              width={56}
-              height={56}
+              width={80}
+              height={80}
               className='object-cover w-full h-full'
             />
           ) : portraitId ? (
             <Image
               src={`/portraits/${portraitId}`}
               alt={characterName ?? "Player"}
-              width={56}
-              height={56}
+              width={80}
+              height={80}
               className='object-cover w-full h-full'
             />
           ) : (
-            <div className='w-full h-full flex items-center justify-center bg-stone-700 text-stone-400 text-sm font-serif'>
+            <div className='w-full h-full flex items-center justify-center bg-stone-700 text-stone-400 text-base font-serif'>
               {characterName?.[0]?.toUpperCase() ?? "?"}
             </div>
           )}
@@ -122,12 +127,12 @@ export default function VideoTile({
 
       {/* Name & class below the video */}
       <div className='flex flex-col items-center text-center leading-tight'>
-        <span className='text-xs font-medium text-amber-300 drop-shadow truncate max-w-full'>
+        <span className='text-xs lg:text-xl font-medium text-amber-300 drop-shadow truncate max-w-full'>
           {characterName ?? "Adventurer"}
           {isLocal && <span className='text-stone-400 ml-1'>(you)</span>}
         </span>
-        <span className='text-[10px] text-stone-400 drop-shadow truncate max-w-full'>
-          {isDm ? "Dungeon Master" : (CLASS_LABELS[playerClass ?? ""] ?? "")}
+        <span className='text-[10px] lg:text-lg text-stone-400 drop-shadow truncate max-w-full'>
+          {isDm ? name : name ? name : (CLASS_LABELS[playerClass ?? ""] ?? "")}
         </span>
       </div>
     </div>

@@ -19,6 +19,7 @@ interface Theme {
 interface ParticipantMeta {
   videoTrack: MediaStreamTrack | null
   audioTrack: MediaStreamTrack | null
+  name?: string
   portraitId?: string
   portraitUrl?: string
   characterName?: string
@@ -34,6 +35,7 @@ interface ParticipantMeta {
 type AppMessage =
   | {
       type: "IDENTITY"
+      name?: string
       portraitId?: string
       portraitUrl?: string
       characterName?: string
@@ -46,6 +48,7 @@ type AppMessage =
 
 interface VideoRoomProps {
   sessionEmail: string
+  sessionName?: string
   sessionCharacterName?: string
   sessionPortraitId?: string
   sessionPortraitUrl?: string
@@ -72,6 +75,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
     {
       videoTrack: null,
       audioTrack: null,
+      name: "Luke",
       characterName: "The DM",
       playerClass: undefined,
       seatIndex: 0,
@@ -87,6 +91,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
     {
       videoTrack: null,
       audioTrack: null,
+      name: "Alice",
       characterName: "Aelric",
       playerClass: "CLERIC",
       seatIndex: 1,
@@ -102,6 +107,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
     {
       videoTrack: null,
       audioTrack: null,
+      name: "Bob",
       characterName: "Thornwick",
       playerClass: "RANGER",
       seatIndex: 2,
@@ -117,6 +123,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
     {
       videoTrack: null,
       audioTrack: null,
+      name: "Charlie",
       characterName: "Morgath",
       playerClass: "BLOOD_HUNTER",
       seatIndex: 3,
@@ -132,6 +139,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
     {
       videoTrack: null,
       audioTrack: null,
+      name: "Diana",
       characterName: "Seraphina",
       playerClass: "PALADIN",
       seatIndex: 4,
@@ -147,6 +155,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
     {
       videoTrack: null,
       audioTrack: null,
+      name: "Eve",
       characterName: "Zephyr",
       playerClass: "SORCERER",
       seatIndex: 5,
@@ -160,6 +169,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
 ]
 
 export default function VideoRoom({
+  sessionName,
   sessionCharacterName,
   sessionPortraitId,
   sessionPortraitUrl,
@@ -188,6 +198,7 @@ export default function VideoRoom({
     (call: DailyCall) => {
       call.sendAppMessage({
         type: "IDENTITY",
+        name: sessionName,
         portraitId: sessionPortraitId,
         portraitUrl: sessionPortraitUrl,
         characterName: sessionCharacterName,
@@ -198,6 +209,7 @@ export default function VideoRoom({
       })
     },
     [
+      sessionName,
       sessionPortraitId,
       sessionPortraitUrl,
       sessionCharacterName,
@@ -225,6 +237,7 @@ export default function VideoRoom({
   ): ParticipantMeta => ({
     videoTrack: p.tracks.video?.persistentTrack ?? null,
     audioTrack: p.tracks.audio?.persistentTrack ?? null,
+    name: isLocal ? sessionName : undefined,
     portraitId: isLocal ? sessionPortraitId : undefined,
     portraitUrl: isLocal ? sessionPortraitUrl : undefined,
     characterName: isLocal ? sessionCharacterName : (p.user_name ?? undefined),
@@ -249,20 +262,32 @@ export default function VideoRoom({
     setIsMicOn(newState)
   }
 
-  // Update local participant's shadow color immediately when prop changes
+  // Update local participant's identity immediately when props change
   useEffect(() => {
     setParticipants((prev) => {
       const next = new Map(prev)
       for (const [sid, meta] of next) {
         if (meta.isLocal) {
-          next.set(sid, { ...meta, shadowColor: sessionShadowColor })
+          next.set(sid, {
+            ...meta,
+            name: sessionName,
+            characterName: sessionCharacterName,
+            portraitUrl: sessionPortraitUrl,
+            shadowColor: sessionShadowColor,
+          })
           break
         }
       }
       return next
     })
     if (callRef.current) broadcastIdentity(callRef.current)
-  }, [sessionShadowColor, broadcastIdentity])
+  }, [
+    sessionName,
+    sessionCharacterName,
+    sessionPortraitUrl,
+    sessionShadowColor,
+    broadcastIdentity,
+  ])
 
   function toggleCam() {
     const newState = !isCamOn
@@ -359,8 +384,11 @@ export default function VideoRoom({
               const existing = prev.get(sid)
               next.set(sid, {
                 ...buildParticipantMeta(p, p.local),
+                name: p.local ? sessionName : existing?.name,
                 portraitId: existing?.portraitId,
-                portraitUrl: existing?.portraitUrl,
+                portraitUrl: p.local
+                  ? sessionPortraitUrl
+                  : existing?.portraitUrl,
                 characterName: p.local
                   ? sessionCharacterName
                   : (existing?.characterName ?? p.user_name ?? undefined),
@@ -397,6 +425,7 @@ export default function VideoRoom({
               if (entry) {
                 next.set(fromId, {
                   ...entry,
+                  name: msg.name,
                   portraitId: msg.portraitId,
                   portraitUrl: msg.portraitUrl,
                   characterName: msg.characterName,
@@ -494,6 +523,7 @@ export default function VideoRoom({
                 key={sid}
                 videoTrack={meta.videoTrack}
                 audioTrack={meta.audioTrack}
+                name={meta.name}
                 portraitId={meta.portraitId}
                 portraitUrl={meta.portraitUrl}
                 characterName={meta.characterName}
@@ -537,6 +567,7 @@ export default function VideoRoom({
                 <VideoTile
                   videoTrack={meta.videoTrack}
                   audioTrack={meta.audioTrack}
+                  name={meta.name}
                   portraitId={meta.portraitId}
                   portraitUrl={meta.portraitUrl}
                   characterName={meta.characterName}
