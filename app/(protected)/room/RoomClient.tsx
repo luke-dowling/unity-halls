@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react"
 import { signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import VideoRoom from "@/components/VideoRoom"
 import DmControls from "@/components/DmControls"
 import PlayerControls from "@/components/PlayerControls"
@@ -49,6 +50,7 @@ export default function RoomClient({
   themes,
   devMode,
 }: RoomClientProps) {
+  const router = useRouter()
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(initialTheme)
   const [currentThemeId, setCurrentThemeId] = useState(initialThemeId)
   const [isLive, setIsLive] = useState(initialIsLive)
@@ -117,9 +119,13 @@ export default function RoomClient({
     broadcastTheme: (themeId: string, theme: Theme) => void
   } | null>(null)
 
-  // Poll for room live status (players only)
+  // Player join flow: join button → waiting → timeout
+  const [hasJoined, setHasJoined] = useState(false)
+  const [joinTimedOut, setJoinTimedOut] = useState(false)
+
+  // Poll for room live status (players only, after pressing Join)
   useEffect(() => {
-    if (isAdmin || isLive) return
+    if (isAdmin || isLive || !hasJoined) return
 
     const interval = setInterval(async () => {
       try {
@@ -131,8 +137,17 @@ export default function RoomClient({
       } catch {}
     }, 3000)
 
-    return () => clearInterval(interval)
-  }, [isAdmin, isLive])
+    // 2-minute timeout
+    const timeout = setTimeout(() => {
+      setJoinTimedOut(true)
+      setHasJoined(false)
+    }, 120_000)
+
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timeout)
+    }
+  }, [isAdmin, isLive, hasJoined])
 
   // DM: set live when joining
   const handleDmJoined = useCallback(async () => {
@@ -178,38 +193,92 @@ export default function RoomClient({
     setCurrentTrackIndex(0)
   }
 
-  // Waiting room for players when DM isn't live (skip in dev mode)
+  // Player join / waiting flow (skip in dev mode)
   if (!devMode && !isAdmin && !isLive) {
+    // Portrait element shared between join and waiting screens
+    const portrait = sessionPortraitId ? (
+      <div className='w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500/50 shadow-lg shadow-amber-500/20'>
+        <Image
+          src={`/portraits/${sessionPortraitId}`}
+          alt={sessionCharacterName ?? sessionName}
+          width={128}
+          height={128}
+          className='object-cover w-full h-full'
+        />
+      </div>
+    ) : (
+      <div className='w-32 h-32 rounded-full bg-stone-800 border-4 border-amber-500/50 flex items-center justify-center'>
+        <span className='text-5xl text-stone-500 font-serif'>
+          {(sessionCharacterName ?? sessionName)?.[0]?.toUpperCase() ?? "?"}
+        </span>
+      </div>
+    )
+
+    // Waiting for DM (after pressing Join)
+    if (hasJoined) {
+      return (
+        <main className='min-h-screen bg-stone-950 text-stone-100 flex flex-col items-center justify-center gap-6'>
+          {portrait}
+          <div className='text-center space-y-2'>
+            <h2 className='text-xl font-serif text-amber-400'>
+              {sessionCharacterName ?? sessionName}
+            </h2>
+            <p className='text-stone-400 text-sm'>is waiting for DM…</p>
+          </div>
+          <div className='w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin' />
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className='mt-4 px-4 py-2 text-sm text-stone-400 hover:text-stone-100 border border-stone-700 hover:border-stone-500 rounded-lg transition-colors'
+          >
+            Log out
+          </button>
+        </main>
+      )
+    }
+
+    // Join button screen (initial state, or after timeout)
     return (
       <main className='min-h-screen bg-stone-950 text-stone-100 flex flex-col items-center justify-center gap-6'>
-        {sessionPortraitId && (
-          <div className='w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500/50 shadow-lg shadow-amber-500/20'>
-            <Image
-              src={`/portraits/${sessionPortraitId}`}
-              alt={sessionCharacterName ?? sessionName}
-              width={128}
-              height={128}
-              className='object-cover w-full h-full'
-            />
-          </div>
-        )}
-        {!sessionPortraitId && (
-          <div className='w-32 h-32 rounded-full bg-stone-800 border-4 border-amber-500/50 flex items-center justify-center'>
-            <span className='text-5xl text-stone-500 font-serif'>
-              {(sessionCharacterName ?? sessionName)?.[0]?.toUpperCase() ?? "?"}
-            </span>
-          </div>
-        )}
+        {portrait}
         <div className='text-center space-y-2'>
           <h2 className='text-xl font-serif text-amber-400'>
             {sessionCharacterName ?? sessionName}
           </h2>
-          <p className='text-stone-400 text-sm'>is waiting for DM…</p>
+          <p className='text-stone-400 text-sm'>Ready to enter Unity Halls</p>
         </div>
-        <div className='w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin' />
+
+        {joinTimedOut && (
+          <div className='bg-red-900/40 border border-red-700/50 rounded-lg px-4 py-3 max-w-xs text-center'>
+            <p className='text-red-300 text-sm font-medium'>
+              Session not available
+            </p>
+            <p className='text-red-400/80 text-xs mt-1'>
+              The DM hasn&apos;t opened the room yet. Try again later.
+            </p>
+          </div>
+        )}
+
+        <div className='flex items-center gap-3'>
+          <button
+            onClick={() => {
+              setJoinTimedOut(false)
+              setHasJoined(true)
+            }}
+            className='px-8 py-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-semibold text-sm transition-colors shadow-lg shadow-amber-600/20'
+          >
+            Join Session
+          </button>
+          <button
+            onClick={() => router.push("/customize")}
+            className='px-6 py-3 rounded-lg border border-stone-600 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-amber-300 font-medium text-sm transition-colors'
+          >
+            Customize
+          </button>
+        </div>
+
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className='mt-4 px-4 py-2 text-sm text-stone-400 hover:text-stone-100 border border-stone-700 hover:border-stone-500 rounded-lg transition-colors'
+          className='px-4 py-2 text-sm text-stone-400 hover:text-stone-100 border border-stone-700 hover:border-stone-500 rounded-lg transition-colors'
         >
           Log out
         </button>
