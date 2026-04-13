@@ -1,11 +1,8 @@
 "use client"
 
-import { useActionState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-
-type FormState = { error?: string } | null
 
 export default function LoginPage() {
   const router = useRouter()
