@@ -2,13 +2,9 @@ import { auth } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
 import { NextResponse } from "next/server";
 
-function isDm(session: { user: { role: string } }) {
-  return session.user.role === "DM";
-}
-
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session || !isDm(session)) {
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

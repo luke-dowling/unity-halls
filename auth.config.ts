@@ -15,7 +15,7 @@ export const authConfig: NextAuthConfig = {
       const { pathname } = nextUrl;
 
       const isProtected =
-        pathname.startsWith("/room") || pathname.startsWith("/admin");
+        pathname.startsWith("/room") || pathname.startsWith("/admin") || pathname.startsWith("/customize");
       const isAuthPage = pathname.startsWith("/login");
 
       if (isProtected && !isLoggedIn) {
