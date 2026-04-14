@@ -65,7 +65,7 @@ app/
 ### Database (Prisma)
 
 - **Models**: `User` (with `Role` enum: DM/PLAYER, `PlayerClass` enum), `Theme`, `RoomState`
-- Prisma uses the `PrismaPg` adapter with `DATABASE_URL` env var
+- Prisma uses the `PrismaPg` adapter with `POSTGRES_PRISMA_URL` env var
 - Singleton pattern in `lib/prisma.ts` (global cache in dev to avoid connection exhaustion)
 - Seed script (`prisma/seed.ts`) creates DM account + 7 themes (world-map, dungeon, forest, castle, battle, tavern, camp)
 
@@ -107,7 +107,7 @@ app/
 
 ## Environment Variables
 
-See `README.md` for the full `.env` template. Key vars: `DATABASE_URL`, `AUTH_SECRET`, `DAILY_API_KEY`, `DAILY_ROOM_NAME`, `CLOUDINARY_*`, `ADMIN_EMAIL`, `SEED_DM_PASSWORD`, `DEV_MODE`.
+See `README.md` for the full `.env` template. Key vars: `POSTGRES_PRISMA_URL`, `AUTH_SECRET`, `DAILY_API_KEY`, `DAILY_ROOM_NAME`, `CLOUDINARY_*`, `ADMIN_EMAIL`, `SEED_DM_PASSWORD`, `DEV_MODE`.
 
 ## Pitfalls & Notes
 

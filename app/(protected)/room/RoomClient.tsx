@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import VideoRoom from "@/components/VideoRoom"
 import DmControls from "@/components/DmControls"
 import PlayerControls from "@/components/PlayerControls"
+import ParticleOverlay, { type ParticleEffect } from "@/components/ParticleOverlay"
 import PlayerManager from "@/components/PlayerManager"
 import ThemeManager from "@/components/ThemeManager"
 import Image from "next/image"
@@ -75,7 +76,7 @@ export default function RoomClient({
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
-  const [volume, setVolume] = useState(0.125)
+  const [volume, setVolume] = useState(0.01)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [showPlayerManager, setShowPlayerManager] = useState(false)
   const [showThemeManager, setShowThemeManager] = useState(false)
@@ -107,6 +108,7 @@ export default function RoomClient({
   function handleVolumeChange(v: number) {
     setVolume(v)
     if (audioRef.current) audioRef.current.volume = v
+    if (isAdmin) videoRoomApiRef.current?.broadcastVolume(v)
   }
 
   // Keep audio element volume in sync
@@ -114,9 +116,14 @@ export default function RoomClient({
     if (audioRef.current) audioRef.current.volume = volume
   }, [volume, currentTrackIndex, currentTheme])
 
+  const [currentParticleEffect, setCurrentParticleEffect] =
+    useState<ParticleEffect>("none")
+
   // Ref that VideoRoom populates so DmControls can call broadcastState
   const videoRoomApiRef = useRef<{
     broadcastTheme: (themeId: string, theme: Theme) => void
+    broadcastVolume: (volume: number) => void
+    broadcastParticleEffect: (effect: ParticleEffect) => void
   } | null>(null)
 
   // Player join flow: join button → waiting → timeout
@@ -191,6 +198,15 @@ export default function RoomClient({
     setCurrentThemeId(themeId)
     setCurrentTheme(theme)
     setCurrentTrackIndex(0)
+  }
+
+  function handleParticleEffectBroadcast(effect: ParticleEffect) {
+    videoRoomApiRef.current?.broadcastParticleEffect(effect)
+    setCurrentParticleEffect(effect)
+  }
+
+  function handleParticleEffectReceived(effect: ParticleEffect) {
+    setCurrentParticleEffect(effect)
   }
 
   // Player join / waiting flow (skip in dev mode)
@@ -287,47 +303,52 @@ export default function RoomClient({
   }
 
   return (
-    <main className='min-h-screen bg-stone-950 text-stone-100 relative overflow-hidden'>
-      {/* Full-screen background */}
-      {currentTheme?.backgroundUrl && (
-        <div
-          className='absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out'
-          style={{ backgroundImage: `url(${currentTheme.backgroundUrl})` }}
-        >
-          <div className='absolute inset-0 bg-stone-950/60' />
+    <main className='h-screen flex flex-col bg-stone-950 text-stone-100 overflow-hidden'>
+      {/* Top bar — fixed at top, never overlaps content */}
+      <header className='flex-none border-b border-stone-800/50 bg-stone-950/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between'>
+        <span className='font-serif text-amber-400 text-lg'>Unity Halls</span>
+        <div className='flex items-center gap-3 text-xs text-stone-400'>
+          {currentTheme && (
+            <span className='text-amber-300/70 font-serif'>
+              {currentTheme.name}
+            </span>
+          )}
+          {sessionCharacterName && (
+            <span className='text-amber-300 font-medium'>
+              {sessionCharacterName}
+            </span>
+          )}
+          <span>{sessionName}</span>
+          {isAdmin && (
+            <a
+              href='/admin'
+              className='text-amber-500 hover:text-amber-400 underline'
+            >
+              Admin
+            </a>
+          )}
         </div>
-      )}
+      </header>
 
-      {/* Content container */}
-      <div className='relative z-10 min-h-screen flex flex-col'>
-        {/* Top bar */}
-        <header className='border-b border-stone-800/50 bg-stone-950/80 backdrop-blur-sm px-4 py-2 flex items-center justify-between'>
-          <span className='font-serif text-amber-400 text-lg'>Unity Halls</span>
-          <div className='flex items-center gap-3 text-xs text-stone-400'>
-            {currentTheme && (
-              <span className='text-amber-300/70 font-serif'>
-                {currentTheme.name}
-              </span>
-            )}
-            {sessionCharacterName && (
-              <span className='text-amber-300 font-medium'>
-                {sessionCharacterName}
-              </span>
-            )}
-            <span>{sessionName}</span>
-            {isAdmin && (
-              <a
-                href='/admin'
-                className='text-amber-500 hover:text-amber-400 underline'
-              >
-                Admin
-              </a>
-            )}
+      {/* Content area — fills remaining height between header and bottom controls */}
+      <div className='flex-1 relative overflow-hidden'>
+        {/* Background constrained to this area, never under header or footer */}
+        {currentTheme?.backgroundUrl && (
+          <div
+            className='absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out'
+            style={{ backgroundImage: `url(${currentTheme.backgroundUrl})` }}
+          >
+            <div className='absolute inset-0 bg-stone-950/60' />
           </div>
-        </header>
+        )}
 
-        {/* Video area (fills remaining space) */}
-        <div className='flex-1 relative'>
+        {/* Particle effect overlay — above background, below video tiles */}
+        <div className='absolute inset-0 z-5 pointer-events-none'>
+          <ParticleOverlay effect={currentParticleEffect} />
+        </div>
+
+        {/* Video area */}
+        <div className='relative z-10 h-full'>
           <VideoRoom
             sessionEmail={sessionEmail}
             sessionName={isAdmin ? dmName : playerName}
@@ -346,6 +367,11 @@ export default function RoomClient({
             isAdmin={isAdmin}
             currentTheme={currentTheme}
             onThemeChange={handleThemeReceived}
+            onParticleEffectChange={handleParticleEffectReceived}
+            onVolumeReceived={(v) => {
+              setVolume(v)
+              if (audioRef.current) audioRef.current.volume = v
+            }}
             onDmJoined={handleDmJoined}
             onLeave={handleLeave}
             roomStateRef={videoRoomApiRef}
@@ -420,6 +446,8 @@ export default function RoomClient({
                 themes={themeList}
                 currentThemeId={currentThemeId}
                 onThemeSelect={handleThemeBroadcast}
+                currentParticleEffect={currentParticleEffect}
+                onParticleEffectSelect={handleParticleEffectBroadcast}
                 isPlaying={isPlaying}
                 onPlayPause={handlePlayPause}
                 onNextTrack={handleNextTrack}

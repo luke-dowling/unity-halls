@@ -8,6 +8,7 @@ import DailyIframe, {
   DailyEventObjectAppMessage,
 } from "@daily-co/daily-js"
 import VideoTile from "@/components/VideoTile"
+import type { ParticleEffect } from "@/components/ParticleOverlay"
 
 interface Theme {
   id: string
@@ -45,6 +46,8 @@ type AppMessage =
       shadowColor?: string
     }
   | { type: "THEME_CHANGE"; themeId: string; theme: Theme }
+  | { type: "VOLUME_CHANGE"; volume: number }
+  | { type: "PARTICLE_EFFECT_CHANGE"; effect: ParticleEffect }
 
 interface VideoRoomProps {
   sessionEmail: string
@@ -58,10 +61,14 @@ interface VideoRoomProps {
   isAdmin: boolean
   currentTheme: Theme | null
   onThemeChange?: (themeId: string, theme: Theme) => void
+  onParticleEffectChange?: (effect: ParticleEffect) => void
   onDmJoined?: () => void
   onLeave?: () => void
+  onVolumeReceived?: (volume: number) => void
   roomStateRef?: React.MutableRefObject<{
     broadcastTheme: (themeId: string, theme: Theme) => void
+    broadcastVolume: (volume: number) => void
+    broadcastParticleEffect: (effect: ParticleEffect) => void
   } | null>
   devMode?: boolean
 }
@@ -178,6 +185,8 @@ export default function VideoRoom({
   sessionShadowColor,
   isAdmin,
   onThemeChange,
+  onParticleEffectChange,
+  onVolumeReceived,
   onDmJoined,
   onLeave,
   roomStateRef,
@@ -224,12 +233,20 @@ export default function VideoRoom({
     callRef.current?.sendAppMessage({ type: "THEME_CHANGE", themeId, theme })
   }, [])
 
-  // Expose broadcastTheme to parent via ref
+  const broadcastVolume = useCallback((volume: number) => {
+    callRef.current?.sendAppMessage({ type: "VOLUME_CHANGE", volume })
+  }, [])
+
+  const broadcastParticleEffect = useCallback((effect: ParticleEffect) => {
+    callRef.current?.sendAppMessage({ type: "PARTICLE_EFFECT_CHANGE", effect })
+  }, [])
+
+  // Expose broadcast helpers to parent via ref
   useEffect(() => {
     if (roomStateRef) {
-      roomStateRef.current = { broadcastTheme }
+      roomStateRef.current = { broadcastTheme, broadcastVolume, broadcastParticleEffect }
     }
-  }, [roomStateRef, broadcastTheme])
+  }, [roomStateRef, broadcastTheme, broadcastVolume, broadcastParticleEffect])
 
   const buildParticipantMeta = (
     p: DailyParticipant,
@@ -439,6 +456,10 @@ export default function VideoRoom({
             })
           } else if (msg.type === "THEME_CHANGE") {
             onThemeChange?.(msg.themeId, msg.theme)
+          } else if (msg.type === "VOLUME_CHANGE") {
+            onVolumeReceived?.(msg.volume)
+          } else if (msg.type === "PARTICLE_EFFECT_CHANGE") {
+            onParticleEffectChange?.(msg.effect)
           }
         })
 
@@ -509,11 +530,11 @@ export default function VideoRoom({
   const totalTiles = tiles.length
 
   return (
-    <div className='flex flex-col h-full pb-[76px]'>
+    <div className='flex flex-col h-full'>
       {/* Circular layout (desktop) / Grid (mobile) */}
       <div className='flex-1 flex items-center justify-center p-4 pt-18 lg:pt-0'>
-        {/* Mobile grid */}
-        <div className='grid grid-cols-2 gap-3 lg:hidden w-full max-w-lg'>
+        {/* Grid layout: mobile (2-col) + lg short-height (3-col) */}
+        <div className='video-tiles-grid grid-cols-2 gap-10 w-3/4 max-w-lg'>
           {tiles.map(([sid, meta]) => {
             const color = meta.isDm
               ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
@@ -538,10 +559,10 @@ export default function VideoRoom({
           })}
         </div>
 
-        {/* Desktop circular layout */}
+        {/* Desktop circular layout: lg + viewport height >= 840px only */}
         <div
-          className='hidden lg:block relative'
-          style={{ width: "min(90vh, 1400px)", height: "min(75vh, 1000px)" }}
+          className='video-tiles-circle relative -mt-30'
+          style={{ width: "min(90vw, 900px)", height: "min(80vh, 1000px)" }}
         >
           {tiles.map(([sid, meta], index) => {
             const color = meta.isDm
@@ -558,7 +579,7 @@ export default function VideoRoom({
             return (
               <div
                 key={sid}
-                className='absolute transform -translate-x-1/2 -translate-y-1/2 w-72 h-28 '
+                className='absolute transform -translate-x-1/2 -translate-y-1/2 w-62 h-26 '
                 style={{
                   left: `${cx}%`,
                   top: `${cy}%`,
@@ -585,7 +606,7 @@ export default function VideoRoom({
       </div>
 
       {/* Bottom controls bar */}
-      <div className='fixed bottom-0 left-0 right-0 z-30 flex items-center justify-center gap-4 py-4 bg-stone-950/90 backdrop-blur-sm border-t border-stone-800/50'>
+      <div className='flex-none flex items-center justify-center gap-4 py-4 bg-stone-950/90 backdrop-blur-sm border-t border-stone-800/50'>
         {/* Mic toggle */}
         <button
           onClick={toggleMic}

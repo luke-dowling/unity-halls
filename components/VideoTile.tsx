@@ -52,12 +52,12 @@ export default function VideoTile({
   }
 
   return (
-    <div className='flex flex-col items-center gap-1.5'>
+    <div className='flex flex-col items-center'>
       {/* Video container wrapper — relative so portrait can overflow */}
       <div className='relative w-full'>
         {/* Video frame — rectangular with rounded edges */}
         <div
-          className='relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 bg-stone-900'
+          className='relative aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 bg-stone-900'
           style={{ boxShadow: `0 0 18px 4px ${shadowColor}99` }}
         >
           {/* Video */}
@@ -126,12 +126,12 @@ export default function VideoTile({
       </div>
 
       {/* Name & class below the video */}
-      <div className='flex flex-col items-center text-center leading-tight'>
-        <span className='text-xs lg:text-xl font-medium text-amber-300 drop-shadow truncate max-w-full'>
+      <div className='flex flex-col items-center text-center gap-0'>
+        <span className='text-xs lg:text-lg mb-[-5px] font-medium text-amber-300 drop-shadow truncate max-w-full'>
           {characterName ?? "Adventurer"}
           {isLocal && <span className='text-stone-400 ml-1'>(you)</span>}
         </span>
-        <span className='text-[10px] lg:text-lg text-stone-400 drop-shadow truncate max-w-full'>
+        <span className='text-[10px] lg:text-sm text-stone-400 drop-shadow truncate max-w-full'>
           {isDm ? name : name ? name : (CLASS_LABELS[playerClass ?? ""] ?? "")}
         </span>
       </div>

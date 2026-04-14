@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { deleteCloudinaryAsset } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -34,11 +35,25 @@ export async function PUT(req: Request) {
   if (parsed.data.shadowColor !== undefined) data.shadowColor = parsed.data.shadowColor;
   if (parsed.data.portraitUrl !== undefined) data.portraitUrl = parsed.data.portraitUrl || null;
 
+  // Capture old portraitUrl before overwriting it.
+  let oldPortraitUrl: string | null = null;
+  if (parsed.data.portraitUrl !== undefined) {
+    const current = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { portraitUrl: true },
+    });
+    oldPortraitUrl = current?.portraitUrl ?? null;
+  }
+
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data,
     select: { id: true, name: true, characterName: true, shadowColor: true, portraitUrl: true },
   });
+
+  if (oldPortraitUrl && oldPortraitUrl !== user.portraitUrl) {
+    await deleteCloudinaryAsset(oldPortraitUrl);
+  }
 
   return NextResponse.json(user);
 }

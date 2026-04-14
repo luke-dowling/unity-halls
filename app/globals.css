@@ -24,3 +24,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Video tile layout: grid on mobile, circle on lg+tall, grid(3col) on lg+short */
+.video-tiles-grid {
+  display: grid !important;
+}
+.video-tiles-circle {
+  display: none !important;
+}
+
+@media (min-width: 1024px) and (min-height: 840px) {
+  .video-tiles-grid {
+    display: none !important;
+  }
+  .video-tiles-circle {
+    display: block !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 839px) {
+  .video-tiles-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    max-width: min(90vw, 900px) !important;
+  }
+}

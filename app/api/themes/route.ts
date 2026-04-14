@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { deleteCloudinaryAsset } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -89,6 +90,21 @@ export async function PUT(req: Request) {
   }
 
   const theme = await prisma.theme.update({ where: { id }, data: parsed.data });
+
+  // Clean up replaced Cloudinary assets after the DB update succeeds.
+  const deletions: Promise<void>[] = [];
+  if (parsed.data.backgroundUrl !== undefined && existing.backgroundUrl && parsed.data.backgroundUrl !== existing.backgroundUrl) {
+    deletions.push(deleteCloudinaryAsset(existing.backgroundUrl));
+  }
+  if (parsed.data.musicUrls !== undefined) {
+    for (const oldUrl of existing.musicUrls) {
+      if (!parsed.data.musicUrls.includes(oldUrl)) {
+        deletions.push(deleteCloudinaryAsset(oldUrl));
+      }
+    }
+  }
+  await Promise.all(deletions);
+
   return NextResponse.json(theme);
 }
 
@@ -116,5 +132,12 @@ export async function DELETE(req: Request) {
   });
 
   await prisma.theme.delete({ where: { id } });
+
+  // Clean up Cloudinary assets after the record is deleted.
+  const deletions: Promise<void>[] = [];
+  if (existing.backgroundUrl) deletions.push(deleteCloudinaryAsset(existing.backgroundUrl));
+  for (const url of existing.musicUrls) deletions.push(deleteCloudinaryAsset(url));
+  await Promise.all(deletions);
+
   return NextResponse.json({ ok: true });
 }

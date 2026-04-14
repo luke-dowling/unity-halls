@@ -26,7 +26,7 @@ Unity Halls lets a Dungeon Master host a video room where players join with thei
 Create a `.env` file in the project root:
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/unity_halls
+POSTGRES_PRISMA_URL=postgresql://user:password@localhost:5432/unity_halls
 AUTH_SECRET=<random-secret-for-nextauth>
 
 DAILY_API_KEY=<your-daily-api-key>
@@ -42,16 +42,16 @@ SEED_DM_PASSWORD=<dm-password-for-seed>
 DEV_MODE=true
 ```
 
-| Variable             | Description                                                    |
-| -------------------- | -------------------------------------------------------------- |
-| `DATABASE_URL`       | PostgreSQL connection string                                   |
-| `AUTH_SECRET`        | Random secret for NextAuth (`npx auth secret` to generate)     |
-| `DAILY_API_KEY`      | API key from your Daily.co dashboard                           |
-| `DAILY_ROOM_NAME`    | Name of the Daily room (defaults to `unity-halls`)             |
-| `CLOUDINARY_*`       | Cloudinary credentials for portrait uploads                    |
-| `ADMIN_EMAIL`        | Email for the DM account created by the seed script            |
-| `SEED_DM_PASSWORD`   | Password for the seeded DM account                             |
-| `DEV_MODE`           | Set to `true` to use mock participants instead of live cameras |
+| Variable              | Description                                                    |
+| --------------------- | -------------------------------------------------------------- |
+| `POSTGRES_PRISMA_URL` | PostgreSQL connection string                                   |
+| `AUTH_SECRET`         | Random secret for NextAuth (`npx auth secret` to generate)     |
+| `DAILY_API_KEY`       | API key from your Daily.co dashboard                           |
+| `DAILY_ROOM_NAME`     | Name of the Daily room (defaults to `unity-halls`)             |
+| `CLOUDINARY_*`        | Cloudinary credentials for portrait uploads                    |
+| `ADMIN_EMAIL`         | Email for the DM account created by the seed script            |
+| `SEED_DM_PASSWORD`    | Password for the seeded DM account                             |
+| `DEV_MODE`            | Set to `true` to use mock participants instead of live cameras |
 
 ## Getting Started
 

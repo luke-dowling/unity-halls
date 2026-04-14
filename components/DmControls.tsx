@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { signOut } from "next-auth/react"
+import type { ParticleEffect } from "@/components/ParticleOverlay"
 
 interface Theme {
   id: string
@@ -38,6 +39,8 @@ interface DmControlsProps {
   onProfileUpdated: (profile: { name: string; characterName: string }) => void
   onOpenPlayerManager: () => void
   onOpenThemeManager: () => void
+  currentParticleEffect: ParticleEffect
+  onParticleEffectSelect: (effect: ParticleEffect) => void
 }
 
 export default function DmControls({
@@ -58,6 +61,8 @@ export default function DmControls({
   onProfileUpdated,
   onOpenPlayerManager,
   onOpenThemeManager,
+  currentParticleEffect,
+  onParticleEffectSelect,
 }: DmControlsProps) {
   const [dmName, setDmName] = useState(initialName)
   const [dmCharacterName, setDmCharacterName] = useState(initialCharacterName)
@@ -105,6 +110,38 @@ export default function DmControls({
             >
               <span className='text-lg'>{THEME_ICONS[theme.id] ?? "🎭"}</span>
               <span>{theme.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Particle effect selector */}
+      <div className='space-y-2'>
+        <label className='block text-xs uppercase tracking-wider text-stone-400'>
+          Atmosphere
+        </label>
+        <div className='grid grid-cols-3 gap-1.5'>
+          {(
+            [
+              { effect: "none", label: "None", icon: "○" },
+              { effect: "snow", label: "Snow", icon: "❄" },
+              { effect: "rain", label: "Rain", icon: "🌧" },
+              { effect: "embers", label: "Embers", icon: "🔥" },
+              { effect: "fog", label: "Fog", icon: "🌫" },
+            ] as { effect: ParticleEffect; label: string; icon: string }[]
+          ).map(({ effect, label, icon }) => (
+            <button
+              key={effect}
+              type='button'
+              onClick={() => onParticleEffectSelect(effect)}
+              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg border text-xs transition-all ${
+                currentParticleEffect === effect
+                  ? "border-amber-500 bg-amber-900/40 text-amber-300 shadow-sm shadow-amber-500/20"
+                  : "border-stone-700 text-stone-300 hover:border-stone-500 hover:bg-stone-800/50"
+              }`}
+            >
+              <span className='text-base leading-none'>{icon}</span>
+              <span>{label}</span>
             </button>
           ))}
         </div>
