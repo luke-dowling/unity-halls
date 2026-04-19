@@ -202,6 +202,26 @@ export default function VideoRoom({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isMicOn, setIsMicOn] = useState(true)
   const [isCamOn, setIsCamOn] = useState(true)
+  const [isBlurOn, setIsBlurOn] = useState(false)
+  const [supportsBlur, setSupportsBlur] = useState(false)
+  const [participantVolumes, setParticipantVolumes] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("unity_halls_volumes")
+      if (stored) setParticipantVolumes(JSON.parse(stored) as Record<string, number>)
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("unity_halls_volumes", JSON.stringify(participantVolumes))
+    } catch { /* ignore */ }
+  }, [participantVolumes])
+
+  function setParticipantVolume(characterName: string, vol: number) {
+    setParticipantVolumes((prev) => ({ ...prev, [characterName]: vol }))
+  }
 
   const broadcastIdentity = useCallback(
     (call: DailyCall) => {
@@ -272,6 +292,19 @@ export default function VideoRoom({
       p.tracks.video?.state === "blocked" ||
       false,
   })
+
+  async function toggleBlur() {
+    if (!callRef.current) return
+    const next = !isBlurOn
+    await callRef.current.updateInputSettings({
+      video: {
+        processor: next
+          ? { type: "background-blur", config: { strength: 0.5 } }
+          : { type: "none" },
+      },
+    })
+    setIsBlurOn(next)
+  }
 
   function toggleMic() {
     const newState = !isMicOn
@@ -368,6 +401,9 @@ export default function VideoRoom({
         call.on("joined-meeting", (evt) => {
           if (!evt) return
           setStatus("joined")
+          setSupportsBlur(
+            DailyIframe.supportedBrowser().supportsVideoProcessing ?? false,
+          )
 
           if (isAdmin) onDmJoined?.()
 
@@ -554,6 +590,8 @@ export default function VideoRoom({
                 isMuted={meta.isMuted}
                 isVideoOff={meta.isVideoOff}
                 shadowColor={color}
+                volume={participantVolumes[meta.characterName ?? ""] ?? 1}
+                onVolumeChange={(vol) => setParticipantVolume(meta.characterName ?? "", vol)}
               />
             )
           })}
@@ -598,6 +636,8 @@ export default function VideoRoom({
                   isMuted={meta.isMuted}
                   isVideoOff={meta.isVideoOff}
                   shadowColor={color}
+                  volume={participantVolumes[meta.characterName ?? ""] ?? 1}
+                  onVolumeChange={(vol) => setParticipantVolume(meta.characterName ?? "", vol)}
                 />
               </div>
             )
@@ -708,6 +748,35 @@ export default function VideoRoom({
             </svg>
           )}
         </button>
+
+        {/* Background blur */}
+        {supportsBlur && (
+          <button
+            onClick={toggleBlur}
+            className={`p-3 rounded-full transition-colors ${
+              isBlurOn
+                ? "bg-amber-700 text-white hover:bg-amber-600"
+                : "bg-stone-800 text-stone-100 hover:bg-stone-700"
+            }`}
+            title={isBlurOn ? "Disable background blur" : "Blur background"}
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='w-5 h-5'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+              strokeWidth={2}
+            >
+              <circle cx='12' cy='12' r='3' />
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                d='M3 12h1m16 0h1M12 3v1m0 16v1M5.636 5.636l.707.707m11.314 11.314.707.707M5.636 18.364l.707-.707m11.314-11.314.707-.707'
+              />
+            </svg>
+          </button>
+        )}
 
         {/* Leave call */}
         <button

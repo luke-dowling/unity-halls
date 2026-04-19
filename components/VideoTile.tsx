@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import { useEffect, useRef, useState } from "react"
 
 interface VideoTileProps {
   videoTrack: MediaStreamTrack | null
@@ -15,6 +16,8 @@ interface VideoTileProps {
   isMuted?: boolean
   isVideoOff?: boolean
   shadowColor?: string
+  volume?: number
+  onVolumeChange?: (vol: number) => void
 }
 
 const CLASS_LABELS: Record<string, string> = {
@@ -38,7 +41,16 @@ export default function VideoTile({
   isMuted = false,
   isVideoOff = false,
   shadowColor = "#78716c",
+  volume = 1,
+  onVolumeChange,
 }: VideoTileProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [showVolume, setShowVolume] = useState(false)
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume])
+
   function attachVideo(el: HTMLVideoElement | null) {
     if (!el || !videoTrack) return
     const stream = new MediaStream([videoTrack])
@@ -46,9 +58,11 @@ export default function VideoTile({
   }
 
   function attachAudio(el: HTMLAudioElement | null) {
+    audioRef.current = el
     if (!el || !audioTrack || isLocal) return
     const stream = new MediaStream([audioTrack])
     el.srcObject = stream
+    el.volume = volume
   }
 
   return (
@@ -89,6 +103,42 @@ export default function VideoTile({
             >
               🎙️✕
             </span>
+          )}
+
+          {/* Volume control — bottom-left, remote tiles only */}
+          {!isLocal && (
+            <div className='absolute bottom-1.5 left-1.5 z-10'>
+              <button
+                onClick={() => setShowVolume((v) => !v)}
+                className='p-1 rounded bg-stone-900/80 text-stone-300 hover:text-amber-400 transition-colors'
+                title='Adjust volume'
+              >
+                {volume === 0 ? (
+                  <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+                    <path strokeLinecap='round' strokeLinejoin='round' d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
+                    <path strokeLinecap='round' strokeLinejoin='round' d='M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2' />
+                  </svg>
+                ) : (
+                  <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+                    <path strokeLinecap='round' strokeLinejoin='round' d='M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
+                  </svg>
+                )}
+              </button>
+              {showVolume && (
+                <div className='absolute bottom-8 left-0 bg-stone-900/95 border border-stone-700 rounded-lg px-2 pt-2 pb-1 shadow-lg flex flex-col items-center gap-1'>
+                  <input
+                    type='range'
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={volume}
+                    onChange={(e) => onVolumeChange?.(parseFloat(e.target.value))}
+                    className='w-20 accent-amber-500'
+                  />
+                  <span className='text-[10px] text-stone-400'>{Math.round(volume * 100)}%</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
