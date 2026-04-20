@@ -8,6 +8,7 @@ import DailyIframe, {
   DailyEventObjectAppMessage,
 } from "@daily-co/daily-js"
 import VideoTile from "@/components/VideoTile"
+import ScreenShareAnnotation, { type Stroke } from "@/components/ScreenShareAnnotation"
 import type { ParticleEffect } from "@/components/ParticleOverlay"
 
 interface Theme {
@@ -33,6 +34,14 @@ interface ParticipantMeta {
   isVideoOff: boolean
 }
 
+export interface ChatMessagePayload {
+  id: string
+  characterName?: string | null
+  shadowColor?: string | null
+  content: string
+  createdAt: string
+}
+
 type AppMessage =
   | {
       type: "IDENTITY"
@@ -48,6 +57,9 @@ type AppMessage =
   | { type: "THEME_CHANGE"; themeId: string; theme: Theme }
   | { type: "VOLUME_CHANGE"; volume: number }
   | { type: "PARTICLE_EFFECT_CHANGE"; effect: ParticleEffect }
+  | { type: "DRAW_STROKE"; stroke: Stroke }
+  | { type: "DRAW_CLEAR" }
+  | ({ type: "CHAT_MESSAGE" } & ChatMessagePayload)
 
 interface VideoRoomProps {
   sessionEmail: string
@@ -65,10 +77,12 @@ interface VideoRoomProps {
   onDmJoined?: () => void
   onLeave?: () => void
   onVolumeReceived?: (volume: number) => void
+  onChatMessage?: (msg: ChatMessagePayload) => void
   roomStateRef?: React.MutableRefObject<{
     broadcastTheme: (themeId: string, theme: Theme) => void
     broadcastVolume: (volume: number) => void
     broadcastParticleEffect: (effect: ParticleEffect) => void
+    broadcastChatMessage: (msg: ChatMessagePayload) => void
   } | null>
   devMode?: boolean
 }
@@ -187,12 +201,14 @@ export default function VideoRoom({
   onThemeChange,
   onParticleEffectChange,
   onVolumeReceived,
+  onChatMessage,
   onDmJoined,
   onLeave,
   roomStateRef,
   devMode,
 }: VideoRoomProps) {
   const callRef = useRef<DailyCall | null>(null)
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null)
   const [participants, setParticipants] = useState<
     Map<string, ParticipantMeta>
   >(new Map())
@@ -205,6 +221,12 @@ export default function VideoRoom({
   const [isBlurOn, setIsBlurOn] = useState(false)
   const [supportsBlur, setSupportsBlur] = useState(false)
   const [participantVolumes, setParticipantVolumes] = useState<Record<string, number>>({})
+  const [screenShare, setScreenShare] = useState<{
+    sessionId: string
+    track: MediaStreamTrack
+  } | null>(null)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [strokes, setStrokes] = useState<Stroke[]>([])
 
   useEffect(() => {
     try {
@@ -261,12 +283,26 @@ export default function VideoRoom({
     callRef.current?.sendAppMessage({ type: "PARTICLE_EFFECT_CHANGE", effect })
   }, [])
 
+  const broadcastStroke = useCallback((stroke: Stroke) => {
+    setStrokes((prev) => [...prev, stroke])
+    callRef.current?.sendAppMessage({ type: "DRAW_STROKE", stroke })
+  }, [])
+
+  const broadcastClear = useCallback(() => {
+    setStrokes([])
+    callRef.current?.sendAppMessage({ type: "DRAW_CLEAR" })
+  }, [])
+
+  const broadcastChatMessage = useCallback((msg: ChatMessagePayload) => {
+    callRef.current?.sendAppMessage({ type: "CHAT_MESSAGE", ...msg })
+  }, [])
+
   // Expose broadcast helpers to parent via ref
   useEffect(() => {
     if (roomStateRef) {
-      roomStateRef.current = { broadcastTheme, broadcastVolume, broadcastParticleEffect }
+      roomStateRef.current = { broadcastTheme, broadcastVolume, broadcastParticleEffect, broadcastChatMessage }
     }
-  }, [roomStateRef, broadcastTheme, broadcastVolume, broadcastParticleEffect])
+  }, [roomStateRef, broadcastTheme, broadcastVolume, broadcastParticleEffect, broadcastChatMessage])
 
   const buildParticipantMeta = (
     p: DailyParticipant,
@@ -344,6 +380,36 @@ export default function VideoRoom({
     if (callRef.current) callRef.current.setLocalVideo(newState)
     setIsCamOn(newState)
   }
+
+  function toggleScreenShare() {
+    if (!callRef.current) return
+    if (isScreenSharing) {
+      callRef.current.stopScreenShare()
+      setIsScreenSharing(false)
+    } else {
+      try {
+        callRef.current.startScreenShare()
+        setIsScreenSharing(true)
+      } catch {
+        // user cancelled or permission denied
+      }
+    }
+  }
+
+  useEffect(() => {
+    const el = screenVideoRef.current
+    if (!el) return
+    if (screenShare?.track) {
+      el.srcObject = new MediaStream([screenShare.track])
+    } else {
+      el.srcObject = null
+    }
+  }, [screenShare?.track])
+
+  // Clear annotations when screen share ends
+  useEffect(() => {
+    if (!screenShare) setStrokes([])
+  }, [screenShare])
 
   async function leaveCall() {
     if (callRef.current) {
@@ -431,6 +497,17 @@ export default function VideoRoom({
 
         call.on("participant-updated", () => {
           const all = call.participants()
+          // Detect active screen share
+          let found: { sessionId: string; track: MediaStreamTrack } | null = null
+          for (const [sid, p] of Object.entries(all)) {
+            const t = p.tracks.screenVideo
+            if (t?.state === "playable" && t.persistentTrack) {
+              found = { sessionId: sid, track: t.persistentTrack }
+              break
+            }
+          }
+          setScreenShare(found)
+          if (!found) setIsScreenSharing(false)
           setParticipants((prev) => {
             const next = new Map<string, ParticipantMeta>()
             for (const [sid, p] of Object.entries(all)) {
@@ -466,6 +543,9 @@ export default function VideoRoom({
             next.delete(evt.participant.session_id)
             return next
           })
+          setScreenShare((prev) =>
+            prev?.sessionId === evt.participant.session_id ? null : prev,
+          )
         })
 
         call.on("app-message", (evt: DailyEventObjectAppMessage) => {
@@ -496,6 +576,12 @@ export default function VideoRoom({
             onVolumeReceived?.(msg.volume)
           } else if (msg.type === "PARTICLE_EFFECT_CHANGE") {
             onParticleEffectChange?.(msg.effect)
+          } else if (msg.type === "DRAW_STROKE") {
+            setStrokes((prev) => [...prev, msg.stroke])
+          } else if (msg.type === "DRAW_CLEAR") {
+            setStrokes([])
+          } else if (msg.type === "CHAT_MESSAGE") {
+            onChatMessage?.({ id: msg.id, characterName: msg.characterName, shadowColor: msg.shadowColor, content: msg.content, createdAt: msg.createdAt })
           }
         })
 
@@ -565,65 +651,75 @@ export default function VideoRoom({
 
   const totalTiles = tiles.length
 
+  const sharerMeta = screenShare ? participants.get(screenShare.sessionId) : null
+  const sharerLabel = sharerMeta?.characterName ?? sharerMeta?.name ?? "Someone"
+
   return (
     <div className='flex flex-col h-full'>
-      {/* Circular layout (desktop) / Grid (mobile) */}
-      <div className='flex-1 flex items-center justify-center p-4 pt-18 lg:pt-0'>
-        {/* Grid layout: mobile (2-col) + lg short-height (3-col) */}
-        <div className='video-tiles-grid grid-cols-2 gap-10 w-3/4 max-w-lg'>
-          {tiles.map(([sid, meta]) => {
-            const color = meta.isDm
-              ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
-              : (meta.shadowColor ?? DEFAULT_SHADOW)
-            return (
-              <VideoTile
-                key={sid}
-                videoTrack={meta.videoTrack}
-                audioTrack={meta.audioTrack}
-                name={meta.name}
-                portraitId={meta.portraitId}
-                portraitUrl={meta.portraitUrl}
-                characterName={meta.characterName}
-                playerClass={meta.playerClass}
-                isDm={meta.isDm}
-                isLocal={meta.isLocal}
-                isMuted={meta.isMuted}
-                isVideoOff={meta.isVideoOff}
-                shadowColor={color}
-                volume={participantVolumes[meta.characterName ?? ""] ?? 1}
-                onVolumeChange={(vol) => setParticipantVolume(meta.characterName ?? "", vol)}
-              />
-            )
-          })}
-        </div>
+      {screenShare ? (
+        <>
+          {/* Screen share presenter view */}
+          <div className='flex-1 relative bg-black flex items-center justify-center overflow-hidden'>
+            <video
+              ref={screenVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className='max-w-full max-h-full object-contain'
+            />
+            <ScreenShareAnnotation
+              isSharer={isScreenSharing}
+              strokes={strokes}
+              onStroke={broadcastStroke}
+              onClear={broadcastClear}
+            />
+            <div className='absolute top-3 right-16 bg-stone-900/80 text-amber-300 text-sm px-3 py-1 rounded-full'>
+              {sharerLabel} is sharing their screen
+            </div>
+          </div>
 
-        {/* Desktop circular layout: lg + viewport height >= 840px only */}
-        <div
-          className='video-tiles-circle relative -mt-30'
-          style={{ width: "min(90vw, 900px)", height: "min(80vh, 1000px)" }}
-        >
-          {tiles.map(([sid, meta], index) => {
-            const color = meta.isDm
-              ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
-              : (meta.shadowColor ?? DEFAULT_SHADOW)
-
-            // Position in ellipse: DM at top, others distributed evenly
-            const angle = (index / totalTiles) * 2 * Math.PI - Math.PI / 2
-            const radiusX = 46 // horizontal % from center
-            const radiusY = 36 // vertical % from center
-            const cx = 50 + radiusX * Math.cos(angle)
-            const cy = 50 + radiusY * Math.sin(angle)
-
-            return (
-              <div
-                key={sid}
-                className='absolute transform -translate-x-1/2 -translate-y-1/2 w-62 h-26 '
-                style={{
-                  left: `${cx}%`,
-                  top: `${cy}%`,
-                }}
-              >
+          {/* Participant strip */}
+          <div className='flex-none flex gap-3 items-end px-4 py-3 bg-stone-950/90 overflow-x-auto border-t border-stone-800/50'>
+            {tiles.map(([sid, meta]) => {
+              const color = meta.isDm
+                ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
+                : (meta.shadowColor ?? DEFAULT_SHADOW)
+              return (
+                <div key={sid} className='flex-none w-36'>
+                  <VideoTile
+                    videoTrack={meta.videoTrack}
+                    audioTrack={meta.audioTrack}
+                    name={meta.name}
+                    portraitId={meta.portraitId}
+                    portraitUrl={meta.portraitUrl}
+                    characterName={meta.characterName}
+                    playerClass={meta.playerClass}
+                    isDm={meta.isDm}
+                    isLocal={meta.isLocal}
+                    isMuted={meta.isMuted}
+                    isVideoOff={meta.isVideoOff}
+                    shadowColor={color}
+                    volume={participantVolumes[meta.characterName ?? ""] ?? 1}
+                    onVolumeChange={(vol) => setParticipantVolume(meta.characterName ?? "", vol)}
+                    compact
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </>
+      ) : (
+        /* Circular layout (desktop) / Grid (mobile) */
+        <div className='flex-1 flex items-center justify-center p-4 pt-18 lg:pt-0'>
+          {/* Grid layout: mobile (2-col) + lg short-height (3-col) */}
+          <div className='video-tiles-grid grid-cols-2 gap-10 w-3/4 max-w-lg'>
+            {tiles.map(([sid, meta]) => {
+              const color = meta.isDm
+                ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
+                : (meta.shadowColor ?? DEFAULT_SHADOW)
+              return (
                 <VideoTile
+                  key={sid}
                   videoTrack={meta.videoTrack}
                   audioTrack={meta.audioTrack}
                   name={meta.name}
@@ -639,11 +735,54 @@ export default function VideoRoom({
                   volume={participantVolumes[meta.characterName ?? ""] ?? 1}
                   onVolumeChange={(vol) => setParticipantVolume(meta.characterName ?? "", vol)}
                 />
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+
+          {/* Desktop circular layout: lg + viewport height >= 840px only */}
+          <div
+            className='video-tiles-circle relative -mt-30'
+            style={{ width: "min(90vw, 900px)", height: "min(80vh, 1000px)" }}
+          >
+            {tiles.map(([sid, meta], index) => {
+              const color = meta.isDm
+                ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
+                : (meta.shadowColor ?? DEFAULT_SHADOW)
+
+              const angle = (index / totalTiles) * 2 * Math.PI - Math.PI / 2
+              const radiusX = 46
+              const radiusY = 36
+              const cx = 50 + radiusX * Math.cos(angle)
+              const cy = 50 + radiusY * Math.sin(angle)
+
+              return (
+                <div
+                  key={sid}
+                  className='absolute transform -translate-x-1/2 -translate-y-1/2 w-62 h-26'
+                  style={{ left: `${cx}%`, top: `${cy}%` }}
+                >
+                  <VideoTile
+                    videoTrack={meta.videoTrack}
+                    audioTrack={meta.audioTrack}
+                    name={meta.name}
+                    portraitId={meta.portraitId}
+                    portraitUrl={meta.portraitUrl}
+                    characterName={meta.characterName}
+                    playerClass={meta.playerClass}
+                    isDm={meta.isDm}
+                    isLocal={meta.isLocal}
+                    isMuted={meta.isMuted}
+                    isVideoOff={meta.isVideoOff}
+                    shadowColor={color}
+                    volume={participantVolumes[meta.characterName ?? ""] ?? 1}
+                    onVolumeChange={(vol) => setParticipantVolume(meta.characterName ?? "", vol)}
+                  />
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Bottom controls bar */}
       <div className='flex-none flex items-center justify-center gap-4 py-4 bg-stone-950/90 backdrop-blur-sm border-t border-stone-800/50'>
@@ -774,6 +913,32 @@ export default function VideoRoom({
                 strokeLinejoin='round'
                 d='M3 12h1m16 0h1M12 3v1m0 16v1M5.636 5.636l.707.707m11.314 11.314.707.707M5.636 18.364l.707-.707m11.314-11.314.707-.707'
               />
+            </svg>
+          </button>
+        )}
+
+        {/* Screen share */}
+        {!devMode && (
+          <button
+            onClick={toggleScreenShare}
+            className={`p-3 rounded-full transition-colors ${
+              isScreenSharing
+                ? "bg-amber-600 text-white hover:bg-amber-500"
+                : "bg-stone-800 text-stone-100 hover:bg-stone-700"
+            }`}
+            title={isScreenSharing ? "Stop sharing" : "Share screen"}
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='w-5 h-5'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+              strokeWidth={2}
+            >
+              <rect x='2' y='3' width='20' height='14' rx='2' />
+              <path strokeLinecap='round' strokeLinejoin='round' d='M8 21h8M12 17v4' />
+              {isScreenSharing && <line x1='1' y1='1' x2='23' y2='23' />}
             </svg>
           </button>
         )}

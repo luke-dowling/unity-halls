@@ -18,6 +18,7 @@ interface VideoTileProps {
   shadowColor?: string
   volume?: number
   onVolumeChange?: (vol: number) => void
+  compact?: boolean
 }
 
 const CLASS_LABELS: Record<string, string> = {
@@ -43,13 +44,66 @@ export default function VideoTile({
   shadowColor = "#78716c",
   volume = 1,
   onVolumeChange,
+  compact = false,
 }: VideoTileProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const frameRef = useRef<HTMLDivElement | null>(null)
   const [showVolume, setShowVolume] = useState(false)
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume
   }, [volume])
+
+  useEffect(() => {
+    if (!audioTrack || isMuted) return
+
+    let ctx: AudioContext
+    let animFrame: number
+    let smoothed = 0
+
+    try {
+      ctx = new AudioContext()
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.8
+      const source = ctx.createMediaStreamSource(new MediaStream([audioTrack]))
+      source.connect(analyser)
+      const data = new Uint8Array(analyser.frequencyBinCount)
+
+      function tick() {
+        analyser.getByteTimeDomainData(data)
+        let sum = 0
+        for (let i = 0; i < data.length; i++) {
+          const v = (data[i] - 128) / 128
+          sum += v * v
+        }
+        const rms = Math.sqrt(sum / data.length)
+        smoothed = smoothed * 0.85 + rms * 0.15
+        const level = Math.min(smoothed * 8, 1)
+
+        const el = frameRef.current
+        if (el) {
+          const size = 18 + level * 30
+          const spread = 4 + level * 12
+          const alpha = Math.round((0.6 + level * 0.4) * 255)
+            .toString(16)
+            .padStart(2, "0")
+          el.style.boxShadow = `0 0 ${size}px ${spread}px ${shadowColor}${alpha}`
+        }
+        animFrame = requestAnimationFrame(tick)
+      }
+
+      animFrame = requestAnimationFrame(tick)
+      if (ctx.state === "suspended") ctx.resume()
+    } catch {
+      return
+    }
+
+    return () => {
+      cancelAnimationFrame(animFrame)
+      ctx?.close()
+    }
+  }, [audioTrack, isMuted, shadowColor])
 
   function attachVideo(el: HTMLVideoElement | null) {
     if (!el || !videoTrack) return
@@ -71,6 +125,7 @@ export default function VideoTile({
       <div className='relative w-full'>
         {/* Video frame — rectangular with rounded edges */}
         <div
+          ref={frameRef}
           className='relative aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 bg-stone-900'
           style={{ boxShadow: `0 0 18px 4px ${shadowColor}99` }}
         >
@@ -144,11 +199,15 @@ export default function VideoTile({
 
         {/* Portrait circle — bottom-right, overlapping outside the video frame */}
         <div
-          className='absolute -bottom-4 -right-5 lg:-bottom-4 lg:-right-5 w-20 h-20 rounded-full border-2 bg-stone-900 overflow-hidden shadow-md z-30'
+          className={`absolute rounded-full border-2 bg-stone-900 overflow-hidden shadow-md z-30 ${
+            compact
+              ? "-bottom-2 -right-2 w-12 h-12"
+              : "-bottom-4 -right-5 lg:-bottom-4 lg:-right-5 w-20 h-20"
+          }`}
           style={{ borderColor: shadowColor }}
         >
           {isDm ? (
-            <div className='w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 text-base font-bold font-serif'>
+            <div className={`w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 font-bold font-serif ${compact ? "text-xs" : "text-base"}`}>
               DM
             </div>
           ) : portraitUrl ? (
@@ -176,15 +235,22 @@ export default function VideoTile({
       </div>
 
       {/* Name & class below the video */}
-      <div className='flex flex-col items-center text-center gap-0'>
-        <span className='text-xs lg:text-lg mb-[-5px] font-medium text-amber-300 drop-shadow truncate max-w-full'>
-          {characterName ?? "Adventurer"}
-          {isLocal && <span className='text-stone-400 ml-1'>(you)</span>}
+      {!compact && (
+        <div className='flex flex-col items-center text-center gap-0'>
+          <span className='text-xs lg:text-lg -mb-1.25 font-medium text-amber-300 drop-shadow truncate max-w-full'>
+            {characterName ?? "Adventurer"}
+            {isLocal && <span className='text-stone-400 ml-1'>(you)</span>}
+          </span>
+          <span className='text-[10px] lg:text-sm text-stone-400 drop-shadow truncate max-w-full'>
+            {isDm ? name : name ? name : (CLASS_LABELS[playerClass ?? ""] ?? "")}
+          </span>
+        </div>
+      )}
+      {compact && (
+        <span className='text-[10px] text-amber-300 truncate max-w-full mt-1'>
+          {characterName ?? "?"}
         </span>
-        <span className='text-[10px] lg:text-sm text-stone-400 drop-shadow truncate max-w-full'>
-          {isDm ? name : name ? name : (CLASS_LABELS[playerClass ?? ""] ?? "")}
-        </span>
-      </div>
+      )}
     </div>
   )
 }

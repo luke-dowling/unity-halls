@@ -9,6 +9,7 @@ import PlayerControls from "@/components/PlayerControls"
 import ParticleOverlay, { type ParticleEffect } from "@/components/ParticleOverlay"
 import PlayerManager from "@/components/PlayerManager"
 import ThemeManager from "@/components/ThemeManager"
+import Chat, { type ChatMessage } from "@/components/Chat"
 import Image from "next/image"
 
 interface Theme {
@@ -124,7 +125,37 @@ export default function RoomClient({
     broadcastTheme: (themeId: string, theme: Theme) => void
     broadcastVolume: (volume: number) => void
     broadcastParticleEffect: (effect: ParticleEffect) => void
+    broadcastChatMessage: (msg: ChatMessage) => void
   } | null>(null)
+
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+
+  useEffect(() => {
+    fetch("/api/chat")
+      .then((r) => r.json())
+      .then((msgs: ChatMessage[]) => setChatMessages(msgs))
+      .catch(() => {})
+  }, [])
+
+  function handleChatMessage(msg: ChatMessage) {
+    setChatMessages((prev) => [...prev, msg])
+  }
+
+  async function handleChatSend(content: string) {
+    const characterName = isAdmin ? dmCharacterName : playerCharacterName
+    const shadowColor = isAdmin ? dmShadowColor : playerShadowColor
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, characterName, shadowColor }),
+    })
+    if (res.ok) {
+      const msg = (await res.json()) as ChatMessage
+      setChatMessages((prev) => [...prev, msg])
+      videoRoomApiRef.current?.broadcastChatMessage(msg)
+    }
+  }
 
   // Player join flow: join button → waiting → timeout
   const [hasJoined, setHasJoined] = useState(false)
@@ -374,6 +405,7 @@ export default function RoomClient({
             }}
             onDmJoined={handleDmJoined}
             onLeave={handleLeave}
+            onChatMessage={handleChatMessage}
             roomStateRef={videoRoomApiRef}
             devMode={devMode}
           />
@@ -541,6 +573,36 @@ export default function RoomClient({
           </aside>
         </>
       )}
+
+      {/* Chat toggle button */}
+      <button
+        onClick={() => setChatOpen(!chatOpen)}
+        className='fixed bottom-20 left-4 z-50 bg-stone-900/90 border border-stone-700 rounded-xl p-3 text-stone-300 hover:text-amber-300 hover:bg-stone-800/90 transition-colors backdrop-blur-sm'
+        title='Toggle chat'
+      >
+        <svg xmlns='http://www.w3.org/2000/svg' className='w-7 h-7' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+          <path strokeLinecap='round' strokeLinejoin='round' d='M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.84L3 20l1.09-3.27A7.93 7.93 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' />
+        </svg>
+      </button>
+
+      {/* Chat panel */}
+      <aside
+        className={`fixed top-0 left-0 h-full w-96 bg-stone-950/95 border-r border-stone-800 backdrop-blur-sm z-40 transform transition-transform duration-300 ease-in-out flex flex-col ${
+          chatOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className='flex-none px-4 pt-4 pb-2 border-b border-stone-800 flex items-center justify-between'>
+          <h2 className='font-serif text-amber-400 text-sm'>Session Chat</h2>
+          <button onClick={() => setChatOpen(false)} className='text-stone-500 hover:text-stone-300'>
+            <svg xmlns='http://www.w3.org/2000/svg' className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+              <path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' />
+            </svg>
+          </button>
+        </div>
+        <div className='flex-1 min-h-0'>
+          <Chat messages={chatMessages} onSend={handleChatSend} />
+        </div>
+      </aside>
 
       {showPlayerManager && (
         <PlayerManager onClose={() => setShowPlayerManager(false)} />
