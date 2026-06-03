@@ -11,11 +11,16 @@ import VideoTile from "@/components/VideoTile"
 import ScreenShareAnnotation, { type Stroke } from "@/components/ScreenShareAnnotation"
 import type { ParticleEffect } from "@/components/ParticleOverlay"
 
-interface Theme {
+interface Background {
   id: string
   name: string
   backgroundUrl: string
-  musicUrls: string[]
+}
+
+interface Soundtrack {
+  id: string
+  name: string
+  trackUrls: string[]
 }
 
 interface ParticipantMeta {
@@ -54,7 +59,8 @@ type AppMessage =
       isDm?: boolean
       shadowColor?: string
     }
-  | { type: "THEME_CHANGE"; themeId: string; theme: Theme }
+  | { type: "BACKGROUND_CHANGE"; backgroundId: string; background: Background }
+  | { type: "SOUNDTRACK_CHANGE"; soundtrackId: string; soundtrack: Soundtrack }
   | { type: "VOLUME_CHANGE"; volume: number }
   | { type: "PARTICLE_EFFECT_CHANGE"; effect: ParticleEffect }
   | { type: "DRAW_STROKE"; stroke: Stroke }
@@ -71,15 +77,17 @@ interface VideoRoomProps {
   sessionSeatIndex?: number
   sessionShadowColor?: string
   isAdmin: boolean
-  currentTheme: Theme | null
-  onThemeChange?: (themeId: string, theme: Theme) => void
+  currentBackground: Background | null
+  onBackgroundChange?: (backgroundId: string, background: Background) => void
+  onSoundtrackChange?: (soundtrackId: string, soundtrack: Soundtrack) => void
   onParticleEffectChange?: (effect: ParticleEffect) => void
   onDmJoined?: () => void
   onLeave?: () => void
   onVolumeReceived?: (volume: number) => void
   onChatMessage?: (msg: ChatMessagePayload) => void
   roomStateRef?: React.MutableRefObject<{
-    broadcastTheme: (themeId: string, theme: Theme) => void
+    broadcastBackground: (backgroundId: string, background: Background) => void
+    broadcastSoundtrack: (soundtrackId: string, soundtrack: Soundtrack) => void
     broadcastVolume: (volume: number) => void
     broadcastParticleEffect: (effect: ParticleEffect) => void
     broadcastChatMessage: (msg: ChatMessagePayload) => void
@@ -198,7 +206,8 @@ export default function VideoRoom({
   sessionSeatIndex,
   sessionShadowColor,
   isAdmin,
-  onThemeChange,
+  onBackgroundChange,
+  onSoundtrackChange,
   onParticleEffectChange,
   onVolumeReceived,
   onChatMessage,
@@ -271,8 +280,12 @@ export default function VideoRoom({
     ],
   )
 
-  const broadcastTheme = useCallback((themeId: string, theme: Theme) => {
-    callRef.current?.sendAppMessage({ type: "THEME_CHANGE", themeId, theme })
+  const broadcastBackground = useCallback((backgroundId: string, background: Background) => {
+    callRef.current?.sendAppMessage({ type: "BACKGROUND_CHANGE", backgroundId, background })
+  }, [])
+
+  const broadcastSoundtrack = useCallback((soundtrackId: string, soundtrack: Soundtrack) => {
+    callRef.current?.sendAppMessage({ type: "SOUNDTRACK_CHANGE", soundtrackId, soundtrack })
   }, [])
 
   const broadcastVolume = useCallback((volume: number) => {
@@ -300,9 +313,9 @@ export default function VideoRoom({
   // Expose broadcast helpers to parent via ref
   useEffect(() => {
     if (roomStateRef) {
-      roomStateRef.current = { broadcastTheme, broadcastVolume, broadcastParticleEffect, broadcastChatMessage }
+      roomStateRef.current = { broadcastBackground, broadcastSoundtrack, broadcastVolume, broadcastParticleEffect, broadcastChatMessage }
     }
-  }, [roomStateRef, broadcastTheme, broadcastVolume, broadcastParticleEffect, broadcastChatMessage])
+  }, [roomStateRef, broadcastBackground, broadcastSoundtrack, broadcastVolume, broadcastParticleEffect, broadcastChatMessage])
 
   const buildParticipantMeta = (
     p: DailyParticipant,
@@ -570,8 +583,10 @@ export default function VideoRoom({
               }
               return next
             })
-          } else if (msg.type === "THEME_CHANGE") {
-            onThemeChange?.(msg.themeId, msg.theme)
+          } else if (msg.type === "BACKGROUND_CHANGE") {
+            onBackgroundChange?.(msg.backgroundId, msg.background)
+          } else if (msg.type === "SOUNDTRACK_CHANGE") {
+            onSoundtrackChange?.(msg.soundtrackId, msg.soundtrack)
           } else if (msg.type === "VOLUME_CHANGE") {
             onVolumeReceived?.(msg.volume)
           } else if (msg.type === "PARTICLE_EFFECT_CHANGE") {
