@@ -6,49 +6,36 @@ import { hash } from "bcryptjs";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const THEMES = [
+const BACKGROUNDS = [
   {
     id: "world-map",
     name: "World Map",
     backgroundUrl: "https://res.cloudinary.com/dkjzfvfws/image/upload/v1774598171/Parador_Second_Sundering_tdiumi.webp",
-    musicUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598042/450_Nightlands_xykuke.mp3"] as string[],
+  },
+  { id: "dungeon", name: "Dungeon", backgroundUrl: "https://res.cloudinary.com/dkjzfvfws/image/upload/v1712649570/test190.jpg" },
+  { id: "forest", name: "Forest", backgroundUrl: "" },
+  { id: "castle", name: "Castle", backgroundUrl: "" },
+  { id: "battle", name: "Battle", backgroundUrl: "" },
+  { id: "tavern", name: "Tavern", backgroundUrl: "" },
+  { id: "camp", name: "Camp", backgroundUrl: "" },
+];
+
+const SOUNDTRACKS = [
+  {
+    id: "world-map",
+    name: "World Map",
+    trackUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598042/450_Nightlands_xykuke.mp3"],
   },
   {
     id: "dungeon",
     name: "Dungeon",
-    backgroundUrl: "https://res.cloudinary.com/dkjzfvfws/image/upload/v1712649570/test190.jpg",
-    musicUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598262/442_Darkmoor_ancez0.mp3"] as string[],
+    trackUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598262/442_Darkmoor_ancez0.mp3"],
   },
-  {
-    id: "forest",
-    name: "Forest",
-    backgroundUrl: "",
-    musicUrls: [] as string[],
-  },
-  {
-    id: "castle",
-    name: "Castle",
-    backgroundUrl: "",
-    musicUrls: [] as string[],
-  },
-  {
-    id: "battle",
-    name: "Battle",
-    backgroundUrl: "",
-    musicUrls: [] as string[],
-  },
-  {
-    id: "tavern",
-    name: "Tavern",
-    backgroundUrl: "",
-    musicUrls: [] as string[],
-  },
-  {
-    id: "camp",
-    name: "Camp",
-    backgroundUrl: "",
-    musicUrls: [] as string[],
-  },
+  { id: "forest", name: "Forest", trackUrls: [] as string[] },
+  { id: "castle", name: "Castle", trackUrls: [] as string[] },
+  { id: "battle", name: "Battle", trackUrls: [] as string[] },
+  { id: "tavern", name: "Tavern", trackUrls: [] as string[] },
+  { id: "camp", name: "Camp", trackUrls: [] as string[] },
 ];
 
 async function main() {
@@ -69,23 +56,30 @@ async function main() {
     update: { role: "DM" },
   });
 
-  // Seed themes
-  for (const theme of THEMES) {
-    await prisma.theme.upsert({
-      where: { id: theme.id },
-      create: theme,
-      update: { name: theme.name, backgroundUrl: theme.backgroundUrl, musicUrls: theme.musicUrls },
+  for (const bg of BACKGROUNDS) {
+    await prisma.background.upsert({
+      where: { id: bg.id },
+      create: bg,
+      update: { name: bg.name, backgroundUrl: bg.backgroundUrl },
+    });
+  }
+
+  for (const st of SOUNDTRACKS) {
+    await prisma.soundtrack.upsert({
+      where: { id: st.id },
+      create: st,
+      update: { name: st.name, trackUrls: st.trackUrls },
     });
   }
 
   await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", themeId: "world-map", isLive: false },
+    create: { id: "default", backgroundId: "world-map", isLive: false },
     update: {},
   });
 
   console.log(`DM account ready: ${dm.email}`);
-  console.log(`Seeded ${THEMES.length} themes`);
+  console.log(`Seeded ${BACKGROUNDS.length} backgrounds, ${SOUNDTRACKS.length} soundtracks`);
   if (adminPassword === "change-me-now") {
     console.log("⚠  Set SEED_DM_PASSWORD in .env.local before seeding in production!");
   }
