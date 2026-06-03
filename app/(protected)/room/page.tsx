@@ -7,7 +7,6 @@ export default async function RoomPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  // Fetch fresh user data from DB so updated colors are always current
   const dbUser = await prisma.user.findUnique({
     where: { email: session.user.email },
     select: {
@@ -23,16 +22,17 @@ export default async function RoomPage() {
 
   const roomState = await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", themeId: "world-map", isLive: false },
+    create: { id: "default", backgroundId: "world-map", isLive: false },
     update: {},
-    include: { theme: true },
+    include: { background: true, soundtrack: true },
   })
 
-  const themes = await prisma.theme.findMany({ orderBy: { name: "asc" } })
+  const [backgrounds, soundtracks] = await Promise.all([
+    prisma.background.findMany({ orderBy: { name: "asc" } }),
+    prisma.soundtrack.findMany({ orderBy: { name: "asc" } }),
+  ])
 
-  console.log(session.user.role)
   const isAdmin = session.user.role === "DM"
-
   const devMode = process.env.DEV_MODE === "true"
 
   return (
@@ -46,10 +46,12 @@ export default async function RoomPage() {
       sessionSeatIndex={dbUser?.seatIndex ?? session.user.seatIndex}
       sessionShadowColor={dbUser?.shadowColor ?? session.user.shadowColor}
       isAdmin={isAdmin}
-      initialThemeId={roomState.themeId ?? "world-map"}
-      initialTheme={roomState.theme}
+      initialBackgroundId={roomState.backgroundId ?? "world-map"}
+      initialBackground={roomState.background}
+      initialSoundtrack={roomState.soundtrack}
       initialIsLive={roomState.isLive}
-      themes={themes}
+      backgrounds={backgrounds}
+      soundtracks={soundtracks}
       devMode={devMode}
     />
   )
