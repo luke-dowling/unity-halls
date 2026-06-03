@@ -8,15 +8,14 @@ function isDm(session: { user: { role: string } }) {
   return session.user.role === "DM";
 }
 
-const backgroundSchema = z.object({
-  id: z.string().min(1).max(80).regex(/^[a-z0-9-]+$/),
+const createSchema = z.object({
   name: z.string().min(1).max(80),
-  backgroundUrl: z.string().url().or(z.literal("")),
+  trackUrls: z.array(z.string().url()).default([]),
 });
 
-const updateBackgroundSchema = z.object({
+const updateSchema = z.object({
   name: z.string().min(1).max(80).optional(),
-  backgroundUrl: z.string().url().or(z.literal("")).optional(),
+  trackUrls: z.array(z.string().url()).optional(),
 });
 
 export async function GET() {
@@ -25,11 +24,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const backgrounds = await prisma.background.findMany({
+  const soundtracks = await prisma.soundtrack.findMany({
     orderBy: { name: "asc" },
   });
 
-  return NextResponse.json(backgrounds);
+  return NextResponse.json(soundtracks);
 }
 
 export async function POST(req: Request) {
@@ -45,18 +44,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = backgroundSchema.safeParse(body);
+  const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
   }
 
-  const existing = await prisma.background.findUnique({ where: { id: parsed.data.id } });
-  if (existing) {
-    return NextResponse.json({ error: "Background ID already exists" }, { status: 409 });
-  }
-
-  const background = await prisma.background.create({ data: parsed.data });
-  return NextResponse.json(background, { status: 201 });
+  const soundtrack = await prisma.soundtrack.create({ data: parsed.data });
+  return NextResponse.json(soundtrack, { status: 201 });
 }
 
 export async function PUT(req: Request) {
@@ -74,30 +68,28 @@ export async function PUT(req: Request) {
 
   const { id, ...rest } = (body as Record<string, unknown>) ?? {};
   if (typeof id !== "string" || !id) {
-    return NextResponse.json({ error: "Missing background id" }, { status: 400 });
+    return NextResponse.json({ error: "Missing soundtrack id" }, { status: 400 });
   }
 
-  const parsed = updateBackgroundSchema.safeParse(rest);
+  const parsed = updateSchema.safeParse(rest);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
   }
 
-  const existing = await prisma.background.findUnique({ where: { id } });
+  const existing = await prisma.soundtrack.findUnique({ where: { id } });
   if (!existing) {
-    return NextResponse.json({ error: "Background not found" }, { status: 404 });
+    return NextResponse.json({ error: "Soundtrack not found" }, { status: 404 });
   }
 
-  const background = await prisma.background.update({ where: { id }, data: parsed.data });
+  const soundtrack = await prisma.soundtrack.update({ where: { id }, data: parsed.data });
 
-  if (
-    parsed.data.backgroundUrl !== undefined &&
-    existing.backgroundUrl &&
-    parsed.data.backgroundUrl !== existing.backgroundUrl
-  ) {
-    await deleteCloudinaryAsset(existing.backgroundUrl);
+  // Clean up any Cloudinary tracks that were removed
+  if (parsed.data.trackUrls !== undefined) {
+    const removed = existing.trackUrls.filter((url) => !parsed.data.trackUrls!.includes(url));
+    await Promise.all(removed.map((url) => deleteCloudinaryAsset(url)));
   }
 
-  return NextResponse.json(background);
+  return NextResponse.json(soundtrack);
 }
 
 export async function DELETE(req: Request) {
@@ -109,24 +101,24 @@ export async function DELETE(req: Request) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) {
-    return NextResponse.json({ error: "Missing background id" }, { status: 400 });
+    return NextResponse.json({ error: "Missing soundtrack id" }, { status: 400 });
   }
 
-  const existing = await prisma.background.findUnique({ where: { id } });
+  const existing = await prisma.soundtrack.findUnique({ where: { id } });
   if (!existing) {
-    return NextResponse.json({ error: "Background not found" }, { status: 404 });
+    return NextResponse.json({ error: "Soundtrack not found" }, { status: 404 });
   }
 
+  // Unlink from any room states pointing to this soundtrack
   await prisma.roomState.updateMany({
-    where: { backgroundId: id },
-    data: { backgroundId: null },
+    where: { soundtrackId: id },
+    data: { soundtrackId: null },
   });
 
-  await prisma.background.delete({ where: { id } });
+  await prisma.soundtrack.delete({ where: { id } });
 
-  if (existing.backgroundUrl) {
-    await deleteCloudinaryAsset(existing.backgroundUrl);
-  }
+  // Clean up all Cloudinary tracks
+  await Promise.all(existing.trackUrls.map((url) => deleteCloudinaryAsset(url)));
 
   return NextResponse.json({ ok: true });
 }

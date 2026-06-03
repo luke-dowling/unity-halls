@@ -4,7 +4,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const updateSchema = z.object({
-  themeId: z.string().min(1).max(50),
+  backgroundId: z.string().min(1).max(50).optional(),
+  soundtrackId: z.string().min(1).max(50).optional(),
+}).refine((d) => d.backgroundId !== undefined || d.soundtrackId !== undefined, {
+  message: "At least one of backgroundId or soundtrackId is required",
 });
 
 export async function GET() {
@@ -15,9 +18,9 @@ export async function GET() {
 
   const state = await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", themeId: "world-map", isLive: false },
+    create: { id: "default", backgroundId: "world-map", isLive: false },
     update: {},
-    include: { theme: true },
+    include: { background: true, soundtrack: true },
   });
 
   return NextResponse.json(state);
@@ -44,17 +47,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
   }
 
-  // Verify theme exists
-  const theme = await prisma.theme.findUnique({ where: { id: parsed.data.themeId } });
-  if (!theme) {
-    return NextResponse.json({ error: "Theme not found" }, { status: 404 });
+  if (parsed.data.backgroundId) {
+    const background = await prisma.background.findUnique({ where: { id: parsed.data.backgroundId } });
+    if (!background) {
+      return NextResponse.json({ error: "Background not found" }, { status: 404 });
+    }
+  }
+
+  if (parsed.data.soundtrackId) {
+    const soundtrack = await prisma.soundtrack.findUnique({ where: { id: parsed.data.soundtrackId } });
+    if (!soundtrack) {
+      return NextResponse.json({ error: "Soundtrack not found" }, { status: 404 });
+    }
   }
 
   const state = await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", themeId: parsed.data.themeId },
-    update: { themeId: parsed.data.themeId },
-    include: { theme: true },
+    create: { id: "default", ...parsed.data },
+    update: parsed.data,
+    include: { background: true, soundtrack: true },
   });
 
   return NextResponse.json(state);
