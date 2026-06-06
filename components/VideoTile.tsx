@@ -120,137 +120,129 @@ export default function VideoTile({
   }
 
   return (
-    <div className='flex flex-col items-center'>
-      {/* Video container wrapper — relative so portrait can overflow */}
-      <div className='relative w-full'>
-        {/* Video frame — rectangular with rounded edges */}
-        <div
-          ref={frameRef}
-          className='relative aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 bg-stone-900'
-          style={{ boxShadow: `0 0 18px 4px ${shadowColor}99` }}
-        >
-          {/* Video */}
-          {videoTrack && !isVideoOff ? (
-            <video
-              ref={attachVideo}
-              autoPlay
-              playsInline
-              muted
-              className='absolute inset-0 w-full h-full object-cover'
-            />
-          ) : (
-            /* Fallback: dark bg with initials */
-            <div className='absolute inset-0 flex items-center justify-center bg-stone-800'>
-              <span className='text-4xl text-stone-500 font-serif'>
-                {characterName?.[0]?.toUpperCase() ?? "?"}
-              </span>
-            </div>
-          )}
-
-          {/* Hidden audio element for remote participants */}
-          {!isLocal && <audio ref={attachAudio} autoPlay />}
-
-          {/* Muted indicator — top-right corner */}
-          {isMuted && (
-            <span
-              title='Muted'
-              className='absolute top-1.5 right-1.5 text-red-400 text-[10px] font-medium bg-stone-900/80 rounded px-1 z-10'
-            >
-              🎙️✕
-            </span>
-          )}
-
-          {/* Volume control — bottom-left, remote tiles only */}
-          {!isLocal && (
-            <div className='absolute bottom-1.5 left-1.5 z-10'>
-              <button
-                onClick={() => setShowVolume((v) => !v)}
-                className='p-1 rounded bg-stone-900/80 text-stone-300 hover:text-amber-400 transition-colors'
-                title='Adjust volume'
-              >
-                {volume === 0 ? (
-                  <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-                    <path strokeLinecap='round' strokeLinejoin='round' d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
-                    <path strokeLinecap='round' strokeLinejoin='round' d='M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2' />
-                  </svg>
-                ) : (
-                  <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-                    <path strokeLinecap='round' strokeLinejoin='round' d='M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
-                  </svg>
-                )}
-              </button>
-              {showVolume && (
-                <div className='absolute bottom-8 left-0 bg-stone-900/95 border border-stone-700 rounded-lg px-2 pt-2 pb-1 shadow-lg flex flex-col items-center gap-1'>
-                  <input
-                    type='range'
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={volume}
-                    onChange={(e) => onVolumeChange?.(parseFloat(e.target.value))}
-                    className='w-20 accent-amber-500'
-                  />
-                  <span className='text-[10px] text-stone-400'>{Math.round(volume * 100)}%</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Portrait circle — bottom-right, overlapping outside the video frame */}
-        <div
-          className={`absolute rounded-full border-2 bg-stone-900 overflow-hidden shadow-md z-30 ${
-            compact
-              ? "-bottom-2 -right-2 w-12 h-12"
-              : "-bottom-4 -right-5 lg:-bottom-4 lg:-right-5 w-20 h-20"
-          }`}
-          style={{ borderColor: shadowColor }}
-        >
-          {isDm ? (
-            <div className={`w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 font-bold font-serif ${compact ? "text-xs" : "text-base"}`}>
-              DM
-            </div>
-          ) : portraitUrl ? (
-            <Image
-              src={portraitUrl}
-              alt={characterName ?? "Player"}
-              width={80}
-              height={80}
-              className='object-cover w-full h-full'
-            />
-          ) : portraitId ? (
-            <Image
-              src={`/portraits/${portraitId}`}
-              alt={characterName ?? "Player"}
-              width={80}
-              height={80}
-              className='object-cover w-full h-full'
-            />
-          ) : (
-            <div className='w-full h-full flex items-center justify-center bg-stone-700 text-stone-400 text-base font-serif'>
+    <div className='relative w-full group'>
+      {/* Video frame — rectangular with rounded edges */}
+      <div
+        ref={frameRef}
+        className='relative aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 bg-stone-900'
+        style={{ boxShadow: `0 0 18px 4px ${shadowColor}99` }}
+      >
+        {/* Video */}
+        {videoTrack && !isVideoOff ? (
+          <video
+            ref={attachVideo}
+            autoPlay
+            playsInline
+            muted
+            className='absolute inset-0 w-full h-full object-cover'
+          />
+        ) : (
+          /* Fallback: dark bg with initials */
+          <div className='absolute inset-0 flex items-center justify-center bg-stone-800'>
+            <span className='text-4xl text-stone-500 font-serif'>
               {characterName?.[0]?.toUpperCase() ?? "?"}
-            </div>
+            </span>
+          </div>
+        )}
+
+        {/* Hidden audio element for remote participants */}
+        {!isLocal && <audio ref={attachAudio} autoPlay />}
+
+        {/* Muted indicator — top-right corner */}
+        {isMuted && (
+          <span
+            title='Muted'
+            className='absolute top-1.5 right-1.5 text-red-400 text-[10px] font-medium bg-stone-900/80 rounded px-1 z-10'
+          >
+            🎙️✕
+          </span>
+        )}
+
+        {/* Volume control — bottom-left, remote tiles only, visible on hover */}
+        {!isLocal && (
+          <div className={`absolute bottom-1.5 left-1.5 z-20 transition-opacity ${showVolume ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+            <button
+              onClick={() => setShowVolume((v) => !v)}
+              className='p-1 rounded bg-stone-900/80 text-stone-300 hover:text-amber-400 transition-colors'
+              title='Adjust volume'
+            >
+              {volume === 0 ? (
+                <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2' />
+                </svg>
+              ) : (
+                <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
+                </svg>
+              )}
+            </button>
+            {showVolume && (
+              <div className='absolute bottom-8 left-0 bg-stone-900/95 border border-stone-700 rounded-lg px-2 pt-2 pb-1 shadow-lg flex flex-col items-center gap-1'>
+                <input
+                  type='range'
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={volume}
+                  onChange={(e) => onVolumeChange?.(parseFloat(e.target.value))}
+                  className='w-20 accent-amber-500'
+                />
+                <span className='text-[10px] text-stone-400'>{Math.round(volume * 100)}%</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Name overlay — top-left corner, inside the tile */}
+        <div className='absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-2 pt-2 pb-6 pointer-events-none'>
+          <p className={`font-medium text-amber-300 drop-shadow truncate leading-tight ${compact ? "text-[9px]" : "text-sm"}`}>
+            {characterName ?? "Adventurer"}
+            {isLocal && <span className='text-stone-400 font-normal ml-1 text-xs'>(you)</span>}
+          </p>
+          {!compact && (
+            <p className='text-xs text-stone-300/80 drop-shadow truncate leading-tight'>
+              {isDm ? name : name ? name : (CLASS_LABELS[playerClass ?? ""] ?? "")}
+            </p>
           )}
         </div>
       </div>
 
-      {/* Name & class below the video */}
-      {!compact && (
-        <div className='flex flex-col items-center text-center gap-0'>
-          <span className='text-xs lg:text-lg -mb-1.25 font-medium text-amber-300 drop-shadow truncate max-w-full'>
-            {characterName ?? "Adventurer"}
-            {isLocal && <span className='text-stone-400 ml-1'>(you)</span>}
-          </span>
-          <span className='text-[10px] lg:text-sm text-stone-400 drop-shadow truncate max-w-full'>
-            {isDm ? name : name ? name : (CLASS_LABELS[playerClass ?? ""] ?? "")}
-          </span>
-        </div>
-      )}
-      {compact && (
-        <span className='text-[10px] text-amber-300 truncate max-w-full mt-1'>
-          {characterName ?? "?"}
-        </span>
-      )}
+      {/* Portrait circle — bottom-right, overlapping outside the video frame */}
+      <div
+        className={`absolute rounded-full border-2 bg-stone-900 overflow-hidden shadow-md z-30 ${
+          compact
+            ? "-bottom-2 -right-2 w-12 h-12"
+            : "-bottom-4 -right-5 lg:-bottom-4 lg:-right-5 w-20 h-20"
+        }`}
+        style={{ borderColor: shadowColor }}
+      >
+        {isDm ? (
+          <div className={`w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 font-bold font-serif ${compact ? "text-xs" : "text-base"}`}>
+            DM
+          </div>
+        ) : portraitUrl ? (
+          <Image
+            src={portraitUrl}
+            alt={characterName ?? "Player"}
+            width={80}
+            height={80}
+            className='object-cover w-full h-full'
+          />
+        ) : portraitId ? (
+          <Image
+            src={`/portraits/${portraitId}`}
+            alt={characterName ?? "Player"}
+            width={80}
+            height={80}
+            className='object-cover w-full h-full'
+          />
+        ) : (
+          <div className='w-full h-full flex items-center justify-center bg-stone-700 text-stone-400 text-base font-serif'>
+            {characterName?.[0]?.toUpperCase() ?? "?"}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
