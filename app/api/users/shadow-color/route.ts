@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 
 const schema = z.object({
   shadowColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -25,10 +26,17 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
   }
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { shadowColor: parsed.data.shadowColor },
-  });
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { shadowColor: parsed.data.shadowColor },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    throw err;
+  }
 
   return NextResponse.json({ shadowColor: parsed.data.shadowColor });
 }
