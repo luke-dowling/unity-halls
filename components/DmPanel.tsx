@@ -12,10 +12,16 @@ interface Background {
   backgroundUrl: string
 }
 
+interface Track {
+  id: string
+  name: string
+  url: string
+}
+
 interface Soundtrack {
   id: string
   name: string
-  trackUrls: string[]
+  tracks: Track[]
 }
 
 interface DmPanelProps {
@@ -24,7 +30,7 @@ interface DmPanelProps {
   onBackgroundSelect: (id: string) => void
   soundtracks: Soundtrack[]
   currentSoundtrackId: string | null
-  onSoundtrackSelect: (id: string) => void
+  onSoundtrackSelect: (id: string, trackIndex?: number) => void
   isPlaying: boolean
   onPlayPause: () => void
   onNextTrack: () => void
@@ -41,6 +47,7 @@ interface DmPanelProps {
   onProfileUpdated: (profile: { name: string; characterName: string }) => void
   onOpenPlayerManager: () => void
   onOpenBackgroundManager: () => void
+  onOpenSoundtrackManager: () => void
 }
 
 const BACKGROUND_ICONS: Record<string, string> = {
@@ -76,6 +83,7 @@ export default function DmPanel({
   onProfileUpdated,
   onOpenPlayerManager,
   onOpenBackgroundManager,
+  onOpenSoundtrackManager,
 }: DmPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("scene")
 
@@ -170,6 +178,7 @@ export default function DmPanel({
             onVolumeChange={onVolumeChange}
             currentTrackIndex={currentTrackIndex}
             totalTracks={totalTracks}
+            onOpenSoundtrackManager={onOpenSoundtrackManager}
           />
         )}
         {activeTab === "atmosphere" && (
@@ -255,10 +264,11 @@ function MusicTab({
   onVolumeChange,
   currentTrackIndex,
   totalTracks,
+  onOpenSoundtrackManager,
 }: {
   soundtracks: Soundtrack[]
   currentSoundtrackId: string | null
-  onSoundtrackSelect: (id: string) => void
+  onSoundtrackSelect: (id: string, trackIndex?: number) => void
   isPlaying: boolean
   onPlayPause: () => void
   onNextTrack: () => void
@@ -266,7 +276,19 @@ function MusicTab({
   onVolumeChange: (v: number) => void
   currentTrackIndex: number
   totalTracks: number
+  onOpenSoundtrackManager: () => void
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(currentSoundtrackId)
+
+  function handleSoundtrackClick(id: string) {
+    if (id === currentSoundtrackId) {
+      setExpandedId(expandedId === id ? null : id)
+    } else {
+      onSoundtrackSelect(id, 0)
+      setExpandedId(id)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Playback controls */}
@@ -316,7 +338,6 @@ function MusicTab({
         <div className="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-stone-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            {volume > 0 && <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" style={{ display: "none" }} />}
           </svg>
           <input
             type="range"
@@ -340,28 +361,80 @@ function MusicTab({
           <p className="text-xs text-stone-600 text-center py-4">No soundtracks yet</p>
         ) : (
           <div className="space-y-1">
-            {soundtracks.map((st) => (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => onSoundtrackSelect(st.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-sm text-left transition-all ${
-                  currentSoundtrackId === st.id
-                    ? "border-amber-500 bg-amber-900/40 text-amber-300 shadow-md shadow-amber-500/20"
-                    : "border-stone-700 text-stone-300 hover:border-stone-500 hover:bg-stone-800/50"
-                }`}
-              >
-                <span className="text-base shrink-0">
-                  {currentSoundtrackId === st.id && isPlaying ? "▶" : "🎵"}
-                </span>
-                <span className="flex-1 truncate">{st.name}</span>
-                <span className="text-xs text-stone-500 shrink-0">
-                  {st.trackUrls.length} {st.trackUrls.length === 1 ? "track" : "tracks"}
-                </span>
-              </button>
-            ))}
+            {soundtracks.map((st) => {
+              const isActive = currentSoundtrackId === st.id
+              const isExpanded = expandedId === st.id
+              return (
+                <div
+                  key={st.id}
+                  className={`rounded-lg border overflow-hidden transition-all ${
+                    isActive
+                      ? "border-amber-500 bg-amber-900/30 shadow-sm shadow-amber-500/20"
+                      : "border-stone-700"
+                  }`}
+                >
+                  {/* Soundtrack header row */}
+                  <button
+                    type="button"
+                    onClick={() => handleSoundtrackClick(st.id)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
+                      isActive ? "text-amber-300" : "text-stone-300 hover:bg-stone-800/50"
+                    }`}
+                  >
+                    <span className="text-stone-500 text-xs w-3 shrink-0">
+                      {isExpanded ? "▾" : "▸"}
+                    </span>
+                    <span className="text-sm shrink-0">
+                      {isActive && isPlaying ? "▶" : "🎵"}
+                    </span>
+                    <span className="flex-1 truncate font-medium">{st.name}</span>
+                    <span className="text-xs text-stone-500 shrink-0">
+                      {st.tracks.length} {st.tracks.length === 1 ? "track" : "tracks"}
+                    </span>
+                  </button>
+
+                  {/* Expandable track list */}
+                  {isExpanded && st.tracks.length > 0 && (
+                    <div className="border-t border-stone-700/60 bg-stone-900/50 py-1">
+                      {st.tracks.map((track, idx) => {
+                        const isCurrentTrack = isActive && currentTrackIndex === idx
+                        return (
+                          <button
+                            key={track.id}
+                            type="button"
+                            onClick={() => onSoundtrackSelect(st.id, idx)}
+                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors ${
+                              isCurrentTrack
+                                ? "text-amber-300 bg-amber-900/20"
+                                : "text-stone-400 hover:text-stone-200 hover:bg-stone-800/40"
+                            }`}
+                          >
+                            <span className="w-4 text-right shrink-0 tabular-nums text-stone-600">
+                              {isCurrentTrack && isPlaying ? "▶" : idx + 1}
+                            </span>
+                            <span className="flex-1 truncate">{track.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {isExpanded && st.tracks.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-stone-600 border-t border-stone-700/60">
+                      No tracks — add some via Manage Soundtracks
+                    </p>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
+        <button
+          type="button"
+          onClick={onOpenSoundtrackManager}
+          className="w-full px-3 py-2 rounded-lg border border-stone-700 text-stone-400 text-xs hover:border-amber-700 hover:text-amber-300 transition-colors"
+        >
+          Manage Soundtracks
+        </button>
       </div>
     </div>
   )

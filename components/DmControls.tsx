@@ -10,10 +10,16 @@ interface Background {
   backgroundUrl: string
 }
 
+interface Track {
+  id: string
+  name: string
+  url: string
+}
+
 interface Soundtrack {
   id: string
   name: string
-  trackUrls: string[]
+  tracks: Track[]
 }
 
 const BACKGROUND_ICONS: Record<string, string> = {
