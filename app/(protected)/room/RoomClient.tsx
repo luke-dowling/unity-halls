@@ -131,6 +131,7 @@ export default function RoomClient({
   function handleTrackEnded() {
     if (!currentSoundtrack?.tracks.length) return
     setCurrentTrackIndex((prev) => (prev + 1) % currentSoundtrack.tracks.length)
+    setIsPlaying(true)
   }
 
   function handlePlayPause() {
@@ -680,6 +681,7 @@ export default function RoomClient({
           key={`${currentSoundtrack.id}-${currentTrackIndex}`}
           src={currentSoundtrack.tracks[currentTrackIndex]?.url}
           autoPlay={isPlaying}
+          loop={currentSoundtrack.tracks.length === 1}
           onEnded={handleTrackEnded}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
