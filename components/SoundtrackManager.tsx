@@ -86,12 +86,29 @@ export default function SoundtrackManager({ onClose, onSoundtracksChanged }: Sou
   }
 
   async function handleUploadAndAddTrack(soundtrackId: string, file: File) {
+    // Get a short-lived signed token — no file data sent to Vercel
+    const signRes = await fetch("/api/upload/sign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder: "unity-halls/soundtracks" }),
+    })
+    if (!signRes.ok) throw new Error(`Upload failed: ${file.name}`)
+    const { signature, timestamp, api_key, cloud_name, folder } =
+      await signRes.json() as { signature: string; timestamp: number; api_key: string; cloud_name: string; folder: string }
+
+    // Upload directly from the browser to Cloudinary — bypasses Vercel's 4.5 MB body limit
     const fd = new FormData()
     fd.append("file", file)
-    fd.append("folder", "unity-halls/soundtracks")
-    const uploadRes = await fetch("/api/upload", { method: "POST", body: fd })
+    fd.append("api_key", api_key)
+    fd.append("timestamp", String(timestamp))
+    fd.append("signature", signature)
+    fd.append("folder", folder)
+    const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloud_name}/video/upload`, {
+      method: "POST",
+      body: fd,
+    })
     if (!uploadRes.ok) throw new Error(`Upload failed: ${file.name}`)
-    const { url } = await uploadRes.json() as { url: string }
+    const { secure_url: url } = await uploadRes.json() as { secure_url: string }
 
     const trackRes = await fetch("/api/tracks", {
       method: "POST",
