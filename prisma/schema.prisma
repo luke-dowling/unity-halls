@@ -59,11 +59,29 @@ model Background {
   roomStates    RoomState[]
 }
 
+model Track {
+  id          String            @id @default(cuid())
+  name        String
+  url         String
+  soundtracks SoundtrackTrack[]
+}
+
+model SoundtrackTrack {
+  id           String     @id @default(cuid())
+  soundtrackId String
+  trackId      String
+  position     Int
+  soundtrack   Soundtrack @relation(fields: [soundtrackId], references: [id], onDelete: Cascade)
+  track        Track      @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([soundtrackId, trackId])
+}
+
 model Soundtrack {
-  id         String      @id @default(cuid())
+  id         String            @id @default(cuid())
   name       String
-  trackUrls  String[]
-  folders    Folder[]    @relation("SoundtrackFolders")
+  tracks     SoundtrackTrack[]
+  folders    Folder[]          @relation("SoundtrackFolders")
   roomStates RoomState[]
 }
 

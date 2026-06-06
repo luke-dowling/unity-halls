@@ -21,21 +21,31 @@ const BACKGROUNDS = [
 ];
 
 const SOUNDTRACKS = [
+  { id: "world-map", name: "World Map" },
+  { id: "dungeon", name: "Dungeon" },
+  { id: "forest", name: "Forest" },
+  { id: "castle", name: "Castle" },
+  { id: "battle", name: "Battle" },
+  { id: "tavern", name: "Tavern" },
+  { id: "camp", name: "Camp" },
+];
+
+const TRACKS = [
   {
-    id: "world-map",
-    name: "World Map",
-    trackUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598042/450_Nightlands_xykuke.mp3"],
+    id: "track-world-map-1",
+    name: "Nightlands",
+    url: "https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598042/450_Nightlands_xykuke.mp3",
   },
   {
-    id: "dungeon",
-    name: "Dungeon",
-    trackUrls: ["https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598262/442_Darkmoor_ancez0.mp3"],
+    id: "track-dungeon-1",
+    name: "Darkmoor",
+    url: "https://res.cloudinary.com/dkjzfvfws/video/upload/v1774598262/442_Darkmoor_ancez0.mp3",
   },
-  { id: "forest", name: "Forest", trackUrls: [] as string[] },
-  { id: "castle", name: "Castle", trackUrls: [] as string[] },
-  { id: "battle", name: "Battle", trackUrls: [] as string[] },
-  { id: "tavern", name: "Tavern", trackUrls: [] as string[] },
-  { id: "camp", name: "Camp", trackUrls: [] as string[] },
+];
+
+const SOUNDTRACK_TRACKS = [
+  { soundtrackId: "world-map", trackId: "track-world-map-1", position: 0 },
+  { soundtrackId: "dungeon", trackId: "track-dungeon-1", position: 0 },
 ];
 
 async function main() {
@@ -68,7 +78,23 @@ async function main() {
     await prisma.soundtrack.upsert({
       where: { id: st.id },
       create: st,
-      update: { name: st.name, trackUrls: st.trackUrls },
+      update: { name: st.name },
+    });
+  }
+
+  for (const track of TRACKS) {
+    await prisma.track.upsert({
+      where: { id: track.id },
+      create: track,
+      update: { name: track.name, url: track.url },
+    });
+  }
+
+  for (const st of SOUNDTRACK_TRACKS) {
+    await prisma.soundtrackTrack.upsert({
+      where: { soundtrackId_trackId: { soundtrackId: st.soundtrackId, trackId: st.trackId } },
+      create: st,
+      update: { position: st.position },
     });
   }
 
@@ -79,7 +105,7 @@ async function main() {
   });
 
   console.log(`DM account ready: ${dm.email}`);
-  console.log(`Seeded ${BACKGROUNDS.length} backgrounds, ${SOUNDTRACKS.length} soundtracks`);
+  console.log(`Seeded ${BACKGROUNDS.length} backgrounds, ${SOUNDTRACKS.length} soundtracks, ${TRACKS.length} tracks`);
   if (adminPassword === "change-me-now") {
     console.log("⚠  Set SEED_DM_PASSWORD in .env.local before seeding in production!");
   }
