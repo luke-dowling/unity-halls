@@ -3,6 +3,27 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import RoomClient from "./RoomClient"
 
+const TRACKS_INCLUDE = {
+  tracks: {
+    include: { track: true },
+    orderBy: { position: "asc" as const },
+  },
+} as const
+
+function mapSoundtrack(st: {
+  id: string
+  name: string
+  tracks: { position: number; track: { id: string; name: string; url: string } }[]
+}) {
+  return {
+    id: st.id,
+    name: st.name,
+    tracks: st.tracks
+      .sort((a, b) => a.position - b.position)
+      .map((t) => t.track),
+  }
+}
+
 export default async function RoomPage() {
   const session = await auth()
   if (!session) redirect("/login")
@@ -24,13 +45,24 @@ export default async function RoomPage() {
     where: { id: "default" },
     create: { id: "default", backgroundId: "world-map", isLive: false },
     update: {},
-    include: { background: true, soundtrack: true },
+    include: {
+      background: true,
+      soundtrack: { include: TRACKS_INCLUDE },
+    },
   })
 
-  const [backgrounds, soundtracks] = await Promise.all([
+  const [backgrounds, rawSoundtracks] = await Promise.all([
     prisma.background.findMany({ orderBy: { name: "asc" } }),
-    prisma.soundtrack.findMany({ orderBy: { name: "asc" } }),
+    prisma.soundtrack.findMany({
+      orderBy: { name: "asc" },
+      include: TRACKS_INCLUDE,
+    }),
   ])
+
+  const soundtracks = rawSoundtracks.map(mapSoundtrack)
+  const initialSoundtrack = roomState.soundtrack
+    ? mapSoundtrack(roomState.soundtrack)
+    : null
 
   const isAdmin = session.user.role === "DM"
   const devMode = process.env.DEV_MODE === "true"
@@ -48,7 +80,7 @@ export default async function RoomPage() {
       isAdmin={isAdmin}
       initialBackgroundId={roomState.backgroundId ?? "world-map"}
       initialBackground={roomState.background}
-      initialSoundtrack={roomState.soundtrack}
+      initialSoundtrack={initialSoundtrack}
       initialIsLive={roomState.isLive}
       backgrounds={backgrounds}
       soundtracks={soundtracks}
