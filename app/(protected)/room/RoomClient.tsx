@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react"
 import { signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
+
 import VideoRoom from "@/components/VideoRoom"
 import DmPanel from "@/components/DmPanel"
 import PlayerControls from "@/components/PlayerControls"
@@ -82,7 +83,7 @@ export default function RoomClient({
   const [soundtrackList, setSoundtrackList] = useState(soundtracks)
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
-  const [volume, setVolume] = useState(0.01)
+  const [volume, setVolume] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isLive, setIsLive] = useState(initialIsLive)
   const [sidebarOpen, setSidebarOpen] = useState(false)
