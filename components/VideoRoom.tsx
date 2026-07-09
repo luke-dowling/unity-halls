@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { signOut } from "next-auth/react"
 import DailyIframe, {
   DailyCall,
@@ -136,22 +136,22 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
       shadowColor: "#f59e0b",
     },
   ],
-  [
-    "dev-p1",
-    {
-      videoTrack: null,
-      audioTrack: null,
-      name: "Alice",
-      characterName: "Aelric",
-      playerClass: "CLERIC",
-      seatIndex: 1,
-      isDm: false,
-      isLocal: false,
-      isMuted: false,
-      isVideoOff: true,
-      shadowColor: "#ffffff",
-    },
-  ],
+  // [
+  //   "dev-p1",
+  //   {
+  //     videoTrack: null,
+  //     audioTrack: null,
+  //     name: "Alice",
+  //     characterName: "Aelric",
+  //     playerClass: "CLERIC",
+  //     seatIndex: 1,
+  //     isDm: false,
+  //     isLocal: false,
+  //     isMuted: false,
+  //     isVideoOff: true,
+  //     shadowColor: "#ffffff",
+  //   },
+  // ],
   [
     "dev-p2",
     {
@@ -259,6 +259,37 @@ export default function VideoRoom({
   } | null>(null)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [strokes, setStrokes] = useState<Stroke[]>([])
+
+  // Sort tiles: DM first (seat 0), then by seatIndex
+  const tiles = Array.from(participants.entries()).sort(([, a], [, b]) => {
+    if (a.isDm) return -1
+    if (b.isDm) return 1
+    return (a.seatIndex ?? 99) - (b.seatIndex ?? 99)
+  })
+
+  const totalTiles = tiles.length
+
+  // Optimal grid layout per participant count
+  const { gridCols, gridRows, colSpans } = useMemo(() => {
+    const n = totalTiles
+    if (n <= 1) return { gridCols: 1, gridRows: 1, colSpans: [] as string[] }
+    if (n === 2) return { gridCols: 2, gridRows: 1, colSpans: [] as string[] }
+    if (n === 3)
+      return {
+        gridCols: 4,
+        gridRows: 2,
+        colSpans: ["1 / 3", "3 / 5", "2 / 4"],
+      }
+    if (n === 4) return { gridCols: 2, gridRows: 2, colSpans: [] as string[] }
+    if (n === 5)
+      return {
+        gridCols: 6,
+        gridRows: 2,
+        // Top 3 tiles fill equal thirds; bottom 2 are the same width, centred (cols 1 & 6 stay empty)
+        colSpans: ["1 / 3", "3 / 5", "5 / 7", "2 / 4", "4 / 6"],
+      }
+    return { gridCols: 3, gridRows: 2, colSpans: [] as string[] }
+  }, [totalTiles])
 
   useEffect(() => {
     try {
@@ -731,15 +762,6 @@ export default function VideoRoom({
     )
   }
 
-  // Sort tiles: DM first (seat 0), then by seatIndex
-  const tiles = Array.from(participants.entries()).sort(([, a], [, b]) => {
-    if (a.isDm) return -1
-    if (b.isDm) return 1
-    return (a.seatIndex ?? 99) - (b.seatIndex ?? 99)
-  })
-
-  const totalTiles = tiles.length
-
   const sharerMeta = screenShare
     ? participants.get(screenShare.sessionId)
     : null
@@ -802,59 +824,28 @@ export default function VideoRoom({
           </div>
         </>
       ) : (
-        /* Circular layout (desktop) / Grid (mobile) */
-        <div className='flex-1 flex items-center justify-center p-4 pt-18 lg:pt-0 @container'>
-          {/* Grid layout: mobile (2-col) + container-lg short-height (3-col) */}
-          <div className='grid grid-cols-2 gap-8 w-full max-w-2xl @[1024px]:[@media(min-height:840px)]:hidden @[1024px]:[@media(max-height:839px)]:grid-cols-3 @[1024px]:[@media(max-height:839px)]:max-w-[min(90vw,900px)]'>
-            {tiles.map(([sid, meta]) => {
-              const color = meta.isDm
-                ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
-                : (meta.shadowColor ?? DEFAULT_SHADOW)
-              return (
-                <VideoTile
-                  key={sid}
-                  videoTrack={meta.videoTrack}
-                  audioTrack={meta.audioTrack}
-                  name={meta.name}
-                  portraitId={meta.portraitId}
-                  portraitUrl={meta.portraitUrl}
-                  characterName={meta.characterName}
-                  playerClass={meta.playerClass}
-                  isDm={meta.isDm}
-                  isLocal={meta.isLocal}
-                  isMuted={meta.isMuted}
-                  isVideoOff={meta.isVideoOff}
-                  shadowColor={color}
-                  volume={participantVolumes[meta.characterName ?? ""] ?? 1}
-                  onVolumeChange={(vol) =>
-                    setParticipantVolume(meta.characterName ?? "", vol)
-                  }
-                />
-              )
-            })}
-          </div>
-
-          {/* Desktop circular layout: container-lg + viewport height >= 840px only */}
+        /* Layout: flex-wrap on small containers, even grid on large (Discord-style) */
+        <div className='flex-1 min-h-0 p-2 @container'>
           <div
-            className='hidden relative @[1024px]:[@media(min-height:840px)]:block'
-            style={{ width: "min(90vw, 900px)", height: "min(75vh, 1000px)" }}
+            className='h-full w-full flex flex-wrap @[640px]:grid gap-2'
+            style={{
+              alignContent: "stretch",
+              gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+              gridTemplateRows: `repeat(${gridRows}, 1fr)`,
+            }}
           >
             {tiles.map(([sid, meta], index) => {
               const color = meta.isDm
                 ? (meta.shadowColor ?? DM_DEFAULT_SHADOW)
                 : (meta.shadowColor ?? DEFAULT_SHADOW)
-
-              const angle = (index / totalTiles) * 2 * Math.PI - Math.PI / 2
-              const radiusX = 46
-              const radiusY = 36
-              const cx = 50 + radiusX * Math.cos(angle)
-              const cy = 50 + radiusY * Math.sin(angle)
-
               return (
                 <div
                   key={sid}
-                  className='absolute transform -translate-x-1/2 -translate-y-1/2 w-76'
-                  style={{ left: `${cx}%`, top: `${cy}%` }}
+                  className='min-h-0'
+                  style={{
+                    flex: "1 1 280px",
+                    ...(colSpans[index] ? { gridColumn: colSpans[index] } : {}),
+                  }}
                 >
                   <VideoTile
                     videoTrack={meta.videoTrack}
@@ -873,6 +864,7 @@ export default function VideoRoom({
                     onVolumeChange={(vol) =>
                       setParticipantVolume(meta.characterName ?? "", vol)
                     }
+                    fill
                   />
                 </div>
               )

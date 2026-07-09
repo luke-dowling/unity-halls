@@ -19,6 +19,7 @@ interface VideoTileProps {
   volume?: number
   onVolumeChange?: (vol: number) => void
   compact?: boolean
+  fill?: boolean
 }
 
 const CLASS_LABELS: Record<string, string> = {
@@ -45,6 +46,7 @@ export default function VideoTile({
   volume = 1,
   onVolumeChange,
   compact = false,
+  fill = false,
 }: VideoTileProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -120,11 +122,11 @@ export default function VideoTile({
   }
 
   return (
-    <div className='relative w-full group'>
+    <div className={`relative w-full group ${fill ? "h-full" : ""}`}>
       {/* Video frame — rectangular with rounded edges */}
       <div
         ref={frameRef}
-        className='relative aspect-[4/3] rounded-2xl overflow-hidden border border-stone-700 bg-stone-900'
+        className={`relative overflow-hidden border border-stone-700 bg-stone-900 rounded-2xl ${fill ? "h-full" : "aspect-[4/3]"}`}
         style={{ boxShadow: `0 0 18px 4px ${shadowColor}99` }}
       >
         {/* Video */}
@@ -160,20 +162,48 @@ export default function VideoTile({
 
         {/* Volume control — bottom-left, remote tiles only, visible on hover */}
         {!isLocal && (
-          <div className={`absolute bottom-1.5 left-1.5 z-20 transition-opacity ${showVolume ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+          <div
+            className={`absolute bottom-1.5 left-1.5 z-20 transition-opacity ${showVolume ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+          >
             <button
               onClick={() => setShowVolume((v) => !v)}
               className='p-1 rounded bg-stone-900/80 text-stone-300 hover:text-amber-400 transition-colors'
               title='Adjust volume'
             >
               {volume === 0 ? (
-                <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-                  <path strokeLinecap='round' strokeLinejoin='round' d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
-                  <path strokeLinecap='round' strokeLinejoin='round' d='M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2' />
+                <svg
+                  xmlns='http://www.w3.org/2000/svg'
+                  className='w-3.5 h-3.5'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z'
+                  />
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2'
+                  />
                 </svg>
               ) : (
-                <svg xmlns='http://www.w3.org/2000/svg' className='w-3.5 h-3.5' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-                  <path strokeLinecap='round' strokeLinejoin='round' d='M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' />
+                <svg
+                  xmlns='http://www.w3.org/2000/svg'
+                  className='w-3.5 h-3.5'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z'
+                  />
                 </svg>
               )}
             </button>
@@ -188,57 +218,73 @@ export default function VideoTile({
                   onChange={(e) => onVolumeChange?.(parseFloat(e.target.value))}
                   className='w-20 accent-amber-500'
                 />
-                <span className='text-[10px] text-stone-400'>{Math.round(volume * 100)}%</span>
+                <span className='text-[10px] text-stone-400'>
+                  {Math.round(volume * 100)}%
+                </span>
               </div>
             )}
           </div>
         )}
 
         {/* Name overlay — top-left corner, inside the tile */}
-        <div className='absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-2 pt-2 pb-6 pointer-events-none'>
-          <p className={`font-medium text-amber-300 drop-shadow truncate leading-tight ${compact ? "text-[9px]" : "text-sm"}`}>
+        <div className='absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-3 pt-3 pb-8 pointer-events-none'>
+          <p
+            className={`font-medium text-amber-300 drop-shadow truncate leading-tight ${compact ? "text-[9px]" : fill ? "text-xl" : "text-sm"}`}
+          >
             {characterName ?? "Adventurer"}
-            {isLocal && <span className='text-stone-400 font-normal ml-1 text-xs'>(you)</span>}
+            {isLocal && (
+              <span className='text-stone-400 font-normal ml-1 text-sm'>
+                (you)
+              </span>
+            )}
           </p>
           {!compact && (
-            <p className='text-xs text-stone-300/80 drop-shadow truncate leading-tight'>
-              {isDm ? name : name ? name : (CLASS_LABELS[playerClass ?? ""] ?? "")}
+            <p className={`text-stone-300/80 drop-shadow truncate leading-tight ${fill ? "text-base" : "text-xs"}`}>
+              {isDm
+                ? name
+                : name
+                  ? name
+                  : (CLASS_LABELS[playerClass ?? ""] ?? "")}
             </p>
           )}
         </div>
       </div>
 
-      {/* Portrait circle — bottom-right, overlapping outside the video frame */}
+      {/* Portrait circle — bottom-right corner */}
       <div
         className={`absolute rounded-full border-2 bg-stone-900 overflow-hidden shadow-md z-30 ${
           compact
             ? "-bottom-2 -right-2 w-12 h-12"
-            : "-bottom-4 -right-5 lg:-bottom-4 lg:-right-5 w-20 h-20"
+            : fill
+              ? "bottom-3 right-3 w-24 h-24"
+              : "-bottom-4 -right-5 lg:-bottom-4 lg:-right-5 w-20 h-20"
         }`}
         style={{ borderColor: shadowColor }}
       >
         {isDm ? (
-          <div className={`w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 font-bold font-serif ${compact ? "text-xs" : "text-base"}`}>
+          <div
+            className={`w-full h-full flex items-center justify-center bg-amber-900/80 text-amber-300 font-bold font-serif ${compact ? "text-xs" : fill ? "text-xl" : "text-base"}`}
+          >
             DM
           </div>
         ) : portraitUrl ? (
           <Image
             src={portraitUrl}
             alt={characterName ?? "Player"}
-            width={80}
-            height={80}
+            width={fill ? 96 : 80}
+            height={fill ? 96 : 80}
             className='object-cover w-full h-full'
           />
         ) : portraitId ? (
           <Image
             src={`/portraits/${portraitId}`}
             alt={characterName ?? "Player"}
-            width={80}
-            height={80}
+            width={fill ? 96 : 80}
+            height={fill ? 96 : 80}
             className='object-cover w-full h-full'
           />
         ) : (
-          <div className='w-full h-full flex items-center justify-center bg-stone-700 text-stone-400 text-base font-serif'>
+          <div className={`w-full h-full flex items-center justify-center bg-stone-700 text-stone-400 font-serif ${fill ? "text-xl" : "text-base"}`}>
             {characterName?.[0]?.toUpperCase() ?? "?"}
           </div>
         )}
