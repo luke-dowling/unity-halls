@@ -13,12 +13,6 @@ import ScreenShareAnnotation, {
 } from "@/components/ScreenShareAnnotation"
 import type { ParticleEffect } from "@/components/ParticleOverlay"
 
-interface Background {
-  id: string
-  name: string
-  backgroundUrl: string
-}
-
 interface Track {
   id: string
   name: string
@@ -67,7 +61,7 @@ type AppMessage =
       isDm?: boolean
       shadowColor?: string
     }
-  | { type: "BACKGROUND_CHANGE"; backgroundId: string; background: Background }
+  | { type: "BACKGROUND_COLOR_CHANGE"; backgroundColor: string }
   | {
       type: "SOUNDTRACK_CHANGE"
       soundtrackId: string
@@ -90,8 +84,7 @@ interface VideoRoomProps {
   sessionSeatIndex?: number
   sessionShadowColor?: string
   isAdmin: boolean
-  currentBackground: Background | null
-  onBackgroundChange?: (backgroundId: string, background: Background) => void
+  onBackgroundColorChange?: (backgroundColor: string) => void
   onSoundtrackChange?: (
     soundtrackId: string,
     soundtrack: Soundtrack,
@@ -103,7 +96,7 @@ interface VideoRoomProps {
   onVolumeReceived?: (volume: number) => void
   onChatMessage?: (msg: ChatMessagePayload) => void
   roomStateRef?: React.MutableRefObject<{
-    broadcastBackground: (backgroundId: string, background: Background) => void
+    broadcastBackgroundColor: (backgroundColor: string) => void
     broadcastSoundtrack: (
       soundtrackId: string,
       soundtrack: Soundtrack,
@@ -114,10 +107,21 @@ interface VideoRoomProps {
     broadcastChatMessage: (msg: ChatMessagePayload) => void
   } | null>
   devMode?: boolean
+  musicAudioRef?: React.RefObject<HTMLAudioElement | null>
+  musicVolume?: number
+}
+
+// An HTMLAudioElement with captureStream() — supported by browsers but not
+// yet part of TypeScript's DOM lib.
+type CaptureableAudioElement = HTMLAudioElement & {
+  captureStream?: () => MediaStream
 }
 
 const DEFAULT_SHADOW = "#78716c"
 const DM_DEFAULT_SHADOW = "#f59e0b"
+const MUSIC_SOURCE_KEY = "__music__"
+const RECORDING_CANVAS_WIDTH = 1280
+const RECORDING_CANVAS_HEIGHT = 720
 
 const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
   [
@@ -227,7 +231,7 @@ export default function VideoRoom({
   sessionSeatIndex,
   sessionShadowColor,
   isAdmin,
-  onBackgroundChange,
+  onBackgroundColorChange,
   onSoundtrackChange,
   onParticleEffectChange,
   onVolumeReceived,
@@ -236,12 +240,15 @@ export default function VideoRoom({
   onLeave,
   roomStateRef,
   devMode,
+  musicAudioRef,
+  musicVolume,
 }: VideoRoomProps) {
   const callRef = useRef<DailyCall | null>(null)
   const screenVideoRef = useRef<HTMLVideoElement | null>(null)
   const [participants, setParticipants] = useState<
     Map<string, ParticipantMeta>
   >(new Map())
+  const participantsRef = useRef<Map<string, ParticipantMeta>>(new Map())
   const [status, setStatus] = useState<
     "idle" | "joining" | "joined" | "error" | "left"
   >("idle")
@@ -259,6 +266,22 @@ export default function VideoRoom({
   } | null>(null)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [strokes, setStrokes] = useState<Stroke[]>([])
+  const [isRecording, setIsRecording] = useState(false)
+  const isRecordingRef = useRef(false)
+  const recordingStopResolveRef = useRef<(() => void) | null>(null)
+  const recordingBlobPartsRef = useRef<Blob[]>([])
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordingCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const recordingRafRef = useRef<number | null>(null)
+  const recordingAudioCtxRef = useRef<AudioContext | null>(null)
+  const recordingDestRef = useRef<MediaStreamAudioDestinationNode | null>(
+    null,
+  )
+  const recordingAudioSourcesRef = useRef<
+    Map<string, { source: MediaStreamAudioSourceNode; track: MediaStreamTrack }>
+  >(new Map())
+  const recordingVideoElsRef = useRef<Map<string, HTMLVideoElement>>(new Map())
+  const recordingMusicGainRef = useRef<GainNode | null>(null)
 
   // Sort tiles: DM first (seat 0), then by seatIndex
   const tiles = Array.from(participants.entries()).sort(([, a], [, b]) => {
@@ -342,16 +365,12 @@ export default function VideoRoom({
     ],
   )
 
-  const broadcastBackground = useCallback(
-    (backgroundId: string, background: Background) => {
-      callRef.current?.sendAppMessage({
-        type: "BACKGROUND_CHANGE",
-        backgroundId,
-        background,
-      })
-    },
-    [],
-  )
+  const broadcastBackgroundColor = useCallback((backgroundColor: string) => {
+    callRef.current?.sendAppMessage({
+      type: "BACKGROUND_COLOR_CHANGE",
+      backgroundColor,
+    })
+  }, [])
 
   const broadcastSoundtrack = useCallback(
     (
@@ -395,7 +414,7 @@ export default function VideoRoom({
   useEffect(() => {
     if (roomStateRef) {
       roomStateRef.current = {
-        broadcastBackground,
+        broadcastBackgroundColor,
         broadcastSoundtrack,
         broadcastVolume,
         broadcastParticleEffect,
@@ -404,7 +423,7 @@ export default function VideoRoom({
     }
   }, [
     roomStateRef,
-    broadcastBackground,
+    broadcastBackgroundColor,
     broadcastSoundtrack,
     broadcastVolume,
     broadcastParticleEffect,
@@ -518,8 +537,245 @@ export default function VideoRoom({
     if (!screenShare) setStrokes([])
   }, [screenShare])
 
+  function downloadRecording(blob: Blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-")
+    a.href = url
+    a.download = `unity-halls-session-${stamp}.webm`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function pickRecordingMimeType(): string {
+    const candidates = [
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ]
+    return (
+      candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? "video/webm"
+    )
+  }
+
+  // Adds/updates/removes per-participant audio+video sources in the
+  // recording graph to track who's currently in the call.
+  function syncRecordingGraph(current: Map<string, ParticipantMeta>) {
+    const ctx = recordingAudioCtxRef.current
+    const dest = recordingDestRef.current
+    if (!ctx || !dest) return
+    const audioMap = recordingAudioSourcesRef.current
+    const videoMap = recordingVideoElsRef.current
+
+    for (const [sid, meta] of current) {
+      const existingAudio = audioMap.get(sid)
+      if (meta.audioTrack && existingAudio?.track !== meta.audioTrack) {
+        existingAudio?.source.disconnect()
+        const source = ctx.createMediaStreamSource(
+          new MediaStream([meta.audioTrack]),
+        )
+        source.connect(dest)
+        audioMap.set(sid, { source, track: meta.audioTrack })
+      } else if (!meta.audioTrack && existingAudio) {
+        existingAudio.source.disconnect()
+        audioMap.delete(sid)
+      }
+
+      let videoEl = videoMap.get(sid)
+      if (!videoEl) {
+        videoEl = document.createElement("video")
+        videoEl.muted = true
+        videoEl.playsInline = true
+        videoMap.set(sid, videoEl)
+      }
+      if (meta.videoTrack) {
+        const current = videoEl.srcObject as MediaStream | null
+        if (!current || current.getVideoTracks()[0] !== meta.videoTrack) {
+          videoEl.srcObject = new MediaStream([meta.videoTrack])
+          videoEl.play().catch(() => {})
+        }
+      } else if (videoEl.srcObject) {
+        videoEl.srcObject = null
+      }
+    }
+
+    for (const sid of Array.from(videoMap.keys())) {
+      if (!current.has(sid)) {
+        videoMap.get(sid)?.pause()
+        videoMap.delete(sid)
+        audioMap.get(sid)?.source.disconnect()
+        audioMap.delete(sid)
+      }
+    }
+  }
+
+  // Redraws the composited grid of participant tiles onto the recording
+  // canvas every frame while a recording is in progress.
+  function drawRecordingFrame() {
+    const canvas = recordingCanvasRef.current
+    const ctx2d = canvas?.getContext("2d")
+    if (!canvas || !ctx2d) return
+
+    const entries = Array.from(participantsRef.current.entries())
+    const n = Math.max(entries.length, 1)
+    const cols = Math.ceil(Math.sqrt(n))
+    const rows = Math.ceil(n / cols)
+    const cellW = canvas.width / cols
+    const cellH = canvas.height / rows
+
+    ctx2d.fillStyle = "#0c0a09"
+    ctx2d.fillRect(0, 0, canvas.width, canvas.height)
+
+    entries.forEach(([sid, meta], i) => {
+      const x = (i % cols) * cellW
+      const y = Math.floor(i / cols) * cellH
+      const videoEl = recordingVideoElsRef.current.get(sid)
+      if (videoEl && meta.videoTrack && videoEl.readyState >= 2) {
+        ctx2d.drawImage(videoEl, x, y, cellW, cellH)
+      } else {
+        ctx2d.fillStyle = meta.shadowColor ?? "#44403c"
+        ctx2d.fillRect(x, y, cellW, cellH)
+      }
+      ctx2d.strokeStyle = "#1c1917"
+      ctx2d.lineWidth = 2
+      ctx2d.strokeRect(x, y, cellW, cellH)
+      ctx2d.fillStyle = "#fbbf24"
+      ctx2d.font = "bold 18px sans-serif"
+      ctx2d.fillText(meta.characterName || meta.name || "Unknown", x + 10, y + cellH - 14)
+    })
+
+    recordingRafRef.current = requestAnimationFrame(drawRecordingFrame)
+  }
+
+  function teardownRecordingGraph() {
+    if (recordingRafRef.current !== null) {
+      cancelAnimationFrame(recordingRafRef.current)
+      recordingRafRef.current = null
+    }
+    for (const v of recordingVideoElsRef.current.values()) v.pause()
+    recordingVideoElsRef.current.clear()
+    for (const { source } of recordingAudioSourcesRef.current.values())
+      source.disconnect()
+    recordingAudioSourcesRef.current.clear()
+    recordingMusicGainRef.current?.disconnect()
+    recordingMusicGainRef.current = null
+    recordingDestRef.current = null
+    recordingCanvasRef.current = null
+    const ctx = recordingAudioCtxRef.current
+    recordingAudioCtxRef.current = null
+    ctx?.close().catch(() => {})
+    mediaRecorderRef.current = null
+  }
+
+  // Records mic + every participant's audio/video + the local soundtrack
+  // element, mixed locally via Web Audio + Canvas — independent of what's
+  // actually transmitted over the Daily call, so players never hear the
+  // soundtrack twice.
+  function startRecording() {
+    if (isRecordingRef.current) return
+
+    const canvas = document.createElement("canvas")
+    canvas.width = RECORDING_CANVAS_WIDTH
+    canvas.height = RECORDING_CANVAS_HEIGHT
+    recordingCanvasRef.current = canvas
+
+    const ctx = new AudioContext()
+    const dest = ctx.createMediaStreamDestination()
+    recordingAudioCtxRef.current = ctx
+    recordingDestRef.current = dest
+    ctx.resume().catch(() => {})
+
+    const musicEl = musicAudioRef?.current as CaptureableAudioElement | null
+    if (musicEl?.captureStream) {
+      try {
+        const musicTrack = musicEl.captureStream().getAudioTracks()[0]
+        if (musicTrack) {
+          const source = ctx.createMediaStreamSource(
+            new MediaStream([musicTrack]),
+          )
+          // captureStream() ignores the <audio> element's .volume, so the
+          // DM's volume slider needs its own gain node to reach the mix.
+          const gain = ctx.createGain()
+          gain.gain.value = musicVolume ?? musicEl.volume
+          source.connect(gain)
+          gain.connect(dest)
+          recordingMusicGainRef.current = gain
+          recordingAudioSourcesRef.current.set(MUSIC_SOURCE_KEY, {
+            source,
+            track: musicTrack,
+          })
+        }
+      } catch (err) {
+        console.error("Could not capture soundtrack audio for recording:", err)
+      }
+    }
+
+    syncRecordingGraph(participantsRef.current)
+
+    const canvasStream = canvas.captureStream(30)
+    const combined = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks(),
+    ])
+
+    const mimeType = pickRecordingMimeType()
+    const recorder = new MediaRecorder(combined, { mimeType })
+    recordingBlobPartsRef.current = []
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordingBlobPartsRef.current.push(e.data)
+    }
+    recorder.onstop = () => {
+      const blob = new Blob(recordingBlobPartsRef.current, { type: mimeType })
+      recordingBlobPartsRef.current = []
+      downloadRecording(blob)
+      teardownRecordingGraph()
+      recordingStopResolveRef.current?.()
+      recordingStopResolveRef.current = null
+    }
+    mediaRecorderRef.current = recorder
+    recorder.start(1000)
+
+    drawRecordingFrame()
+
+    isRecordingRef.current = true
+    setIsRecording(true)
+  }
+
+  // Stops recording and waits for the final chunk so leaveCall() doesn't
+  // tear down the call before the recording has been assembled and saved.
+  function stopRecording(): Promise<void> {
+    const recorder = mediaRecorderRef.current
+    isRecordingRef.current = false
+    setIsRecording(false)
+    if (!recorder || recorder.state === "inactive") return Promise.resolve()
+    const flush = new Promise<void>((resolve) => {
+      recordingStopResolveRef.current = resolve
+    })
+    recorder.stop()
+    return Promise.race([
+      flush,
+      new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+    ])
+  }
+
+  // Keep the recorded soundtrack loudness in sync with the DM's volume
+  // slider while a recording is in progress.
+  useEffect(() => {
+    if (recordingMusicGainRef.current) {
+      recordingMusicGainRef.current.gain.value = musicVolume ?? 0
+    }
+  }, [musicVolume])
+
+  useEffect(() => {
+    participantsRef.current = participants
+    if (isRecordingRef.current) syncRecordingGraph(participants)
+  }, [participants])
+
   async function leaveCall() {
     if (callRef.current) {
+      await stopRecording()
       await callRef.current.leave()
       callRef.current.destroy()
       callRef.current = null
@@ -678,8 +934,8 @@ export default function VideoRoom({
               }
               return next
             })
-          } else if (msg.type === "BACKGROUND_CHANGE") {
-            onBackgroundChange?.(msg.backgroundId, msg.background)
+          } else if (msg.type === "BACKGROUND_COLOR_CHANGE") {
+            onBackgroundColorChange?.(msg.backgroundColor)
           } else if (msg.type === "SOUNDTRACK_CHANGE") {
             onSoundtrackChange?.(
               msg.soundtrackId,
@@ -827,7 +1083,7 @@ export default function VideoRoom({
         /* Layout: flex-wrap on small containers, even grid on large (Discord-style) */
         <div className='flex-1 min-h-0 p-2 @container'>
           <div
-            className='h-full w-full flex flex-wrap @[640px]:grid gap-2'
+            className='h-full w-full flex flex-wrap @[960px]:grid gap-4'
             style={{
               alignContent: "stretch",
               gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
@@ -1032,6 +1288,33 @@ export default function VideoRoom({
                 d='M8 21h8M12 17v4'
               />
               {isScreenSharing && <line x1='1' y1='1' x2='23' y2='23' />}
+            </svg>
+          </button>
+        )}
+
+        {/* Record session (DM only) */}
+        {isAdmin && !devMode && (
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            className={`p-3 rounded-full transition-colors ${
+              isRecording
+                ? "bg-red-600 text-white hover:bg-red-500"
+                : "bg-stone-800 text-stone-100 hover:bg-stone-700"
+            }`}
+            title={isRecording ? "Stop recording" : "Record session"}
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='w-5 h-5'
+              fill='currentColor'
+              viewBox='0 0 24 24'
+            >
+              <circle
+                cx='12'
+                cy='12'
+                r={isRecording ? 6 : 8}
+                className={isRecording ? "animate-pulse" : ""}
+              />
             </svg>
           </button>
         )}

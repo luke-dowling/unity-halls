@@ -565,6 +565,8 @@ export default function RoomClient({
               onChatMessage={handleChatMessage}
               roomStateRef={videoRoomApiRef}
               devMode={devMode}
+              musicAudioRef={audioRef}
+              musicVolume={volume}
             />
           </div>
         </div>
@@ -643,6 +645,7 @@ export default function RoomClient({
         <audio
           ref={audioRef}
           key={`${currentSoundtrack.id}-${currentTrackIndex}`}
+          crossOrigin='anonymous'
           src={currentSoundtrack.tracks[currentTrackIndex]?.url}
           autoPlay={isPlaying}
           loop={currentSoundtrack.tracks.length === 1}
