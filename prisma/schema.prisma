@@ -20,7 +20,6 @@ enum PlayerClass {
 }
 
 enum FolderType {
-  BACKGROUND
   SOUNDTRACK
 }
 
@@ -47,16 +46,7 @@ model Folder {
   parentId    String?
   parent      Folder?      @relation("FolderChildren", fields: [parentId], references: [id])
   children    Folder[]     @relation("FolderChildren")
-  backgrounds Background[] @relation("BackgroundFolders")
   soundtracks Soundtrack[] @relation("SoundtrackFolders")
-}
-
-model Background {
-  id            String      @id
-  name          String
-  backgroundUrl String
-  folders       Folder[]    @relation("BackgroundFolders")
-  roomStates    RoomState[]
 }
 
 model Track {
@@ -86,13 +76,12 @@ model Soundtrack {
 }
 
 model RoomState {
-  id           String      @id @default("default")
-  backgroundId String?
-  background   Background? @relation(fields: [backgroundId], references: [id])
-  soundtrackId String?
-  soundtrack   Soundtrack? @relation(fields: [soundtrackId], references: [id])
-  isLive       Boolean     @default(false)
-  updatedAt    DateTime    @updatedAt
+  id              String      @id @default("default")
+  backgroundColor String      @default("#0c0a09")
+  soundtrackId    String?
+  soundtrack      Soundtrack? @relation(fields: [soundtrackId], references: [id])
+  isLive          Boolean     @default(false)
+  updatedAt       DateTime    @updatedAt
 }
 
 model ChatMessage {

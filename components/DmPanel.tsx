@@ -4,13 +4,7 @@ import { useState } from "react"
 import { signOut } from "next-auth/react"
 import type { ParticleEffect } from "@/components/ParticleOverlay"
 
-type Tab = "scene" | "music" | "atmosphere" | "players" | "profile"
-
-interface Background {
-  id: string
-  name: string
-  backgroundUrl: string
-}
+type Tab = "background" | "music" | "atmosphere" | "players" | "profile"
 
 interface Track {
   id: string
@@ -25,9 +19,8 @@ interface Soundtrack {
 }
 
 interface DmPanelProps {
-  backgrounds: Background[]
-  currentBackgroundId: string
-  onBackgroundSelect: (id: string) => void
+  currentBackgroundColor: string
+  onBackgroundColorChange: (color: string) => void
   soundtracks: Soundtrack[]
   currentSoundtrackId: string | null
   onSoundtrackSelect: (id: string, trackIndex?: number) => void
@@ -46,24 +39,12 @@ interface DmPanelProps {
   onShadowColorChange: (color: string) => void
   onProfileUpdated: (profile: { name: string; characterName: string }) => void
   onOpenPlayerManager: () => void
-  onOpenBackgroundManager: () => void
   onOpenSoundtrackManager: () => void
 }
 
-const BACKGROUND_ICONS: Record<string, string> = {
-  forest: "🌲",
-  castle: "🏰",
-  battle: "⚔️",
-  tavern: "🍺",
-  dungeon: "🕯️",
-  camp: "🏕️",
-  "world-map": "🗺️",
-}
-
 export default function DmPanel({
-  backgrounds,
-  currentBackgroundId,
-  onBackgroundSelect,
+  currentBackgroundColor,
+  onBackgroundColorChange,
   soundtracks,
   currentSoundtrackId,
   onSoundtrackSelect,
@@ -82,15 +63,14 @@ export default function DmPanel({
   onShadowColorChange,
   onProfileUpdated,
   onOpenPlayerManager,
-  onOpenBackgroundManager,
   onOpenSoundtrackManager,
 }: DmPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("scene")
+  const [activeTab, setActiveTab] = useState<Tab>("background")
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     {
-      id: "scene",
-      label: "Scene",
+      id: "background",
+      label: "Background",
       icon: (
         <svg
           xmlns='http://www.w3.org/2000/svg'
@@ -213,12 +193,10 @@ export default function DmPanel({
 
       {/* Tab content */}
       <div className='flex-1 overflow-y-auto p-4 space-y-4'>
-        {activeTab === "scene" && (
-          <SceneTab
-            backgrounds={backgrounds}
-            currentBackgroundId={currentBackgroundId}
-            onBackgroundSelect={onBackgroundSelect}
-            onOpenBackgroundManager={onOpenBackgroundManager}
+        {activeTab === "background" && (
+          <BackgroundTab
+            currentBackgroundColor={currentBackgroundColor}
+            onBackgroundColorChange={onBackgroundColorChange}
           />
         )}
         {activeTab === "music" && (
@@ -260,45 +238,44 @@ export default function DmPanel({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Scene tab                                                          */
+/*  Background tab                                                     */
 /* ------------------------------------------------------------------ */
 
-function SceneTab({
-  backgrounds,
-  currentBackgroundId,
-  onBackgroundSelect,
-  onOpenBackgroundManager,
+function BackgroundTab({
+  currentBackgroundColor,
+  onBackgroundColorChange,
 }: {
-  backgrounds: Background[]
-  currentBackgroundId: string
-  onBackgroundSelect: (id: string) => void
-  onOpenBackgroundManager: () => void
+  currentBackgroundColor: string
+  onBackgroundColorChange: (color: string) => void
 }) {
+  const [stagingColor, setStagingColor] = useState(currentBackgroundColor)
+
   return (
-    <div className='space-y-3'>
-      <div className='grid grid-cols-2 gap-2'>
-        {backgrounds.map((bg) => (
-          <button
-            key={bg.id}
-            type='button'
-            onClick={() => onBackgroundSelect(bg.id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${
-              currentBackgroundId === bg.id
-                ? "border-amber-500 bg-amber-900/40 text-amber-300 shadow-md shadow-amber-500/20"
-                : "border-stone-700 text-stone-300 hover:border-stone-500 hover:bg-stone-800/50"
-            }`}
-          >
-            <span className='text-lg'>{BACKGROUND_ICONS[bg.id] ?? "🎭"}</span>
-            <span className='truncate text-left'>{bg.name}</span>
-          </button>
-        ))}
+    <div className='space-y-2'>
+      <label className='block text-xs uppercase tracking-wider text-stone-400'>
+        Background Color
+      </label>
+      <div className='flex items-center gap-3'>
+        <input
+          type='color'
+          value={stagingColor}
+          onChange={(e) => setStagingColor(e.target.value)}
+          className='w-10 h-8 rounded border border-stone-600 bg-stone-800 cursor-pointer'
+        />
+        <span className='text-xs text-stone-400 font-mono flex-1'>
+          {stagingColor}
+        </span>
+        <div
+          className='w-8 h-8 rounded-lg border border-stone-600 shrink-0'
+          style={{ backgroundColor: stagingColor }}
+        />
       </div>
       <button
         type='button'
-        onClick={onOpenBackgroundManager}
-        className='w-full px-3 py-2 rounded-lg border border-stone-700 text-stone-400 text-xs hover:border-amber-700 hover:text-amber-300 transition-colors'
+        onClick={() => onBackgroundColorChange(stagingColor)}
+        className='w-full px-3 py-1.5 rounded-lg border border-amber-700 bg-amber-900/40 text-amber-300 text-sm font-medium hover:bg-amber-800/50 transition-colors'
       >
-        Manage Backgrounds
+        Apply Color
       </button>
     </div>
   )

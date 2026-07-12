@@ -43,21 +43,17 @@ export default async function RoomPage() {
 
   const roomState = await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", backgroundId: "world-map", isLive: false },
+    create: { id: "default", isLive: false },
     update: {},
     include: {
-      background: true,
       soundtrack: { include: TRACKS_INCLUDE },
     },
   })
 
-  const [backgrounds, rawSoundtracks] = await Promise.all([
-    prisma.background.findMany({ orderBy: { name: "asc" } }),
-    prisma.soundtrack.findMany({
-      orderBy: { name: "asc" },
-      include: TRACKS_INCLUDE,
-    }),
-  ])
+  const rawSoundtracks = await prisma.soundtrack.findMany({
+    orderBy: { name: "asc" },
+    include: TRACKS_INCLUDE,
+  })
 
   const soundtracks = rawSoundtracks.map(mapSoundtrack)
   const initialSoundtrack = roomState.soundtrack
@@ -78,11 +74,9 @@ export default async function RoomPage() {
       sessionSeatIndex={dbUser?.seatIndex ?? session.user.seatIndex}
       sessionShadowColor={dbUser?.shadowColor ?? session.user.shadowColor}
       isAdmin={isAdmin}
-      initialBackgroundId={roomState.backgroundId ?? "world-map"}
-      initialBackground={roomState.background}
+      initialBackgroundColor={roomState.backgroundColor}
       initialSoundtrack={initialSoundtrack}
       initialIsLive={roomState.isLive}
-      backgrounds={backgrounds}
       soundtracks={soundtracks}
       devMode={devMode}
     />

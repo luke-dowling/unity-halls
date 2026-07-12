@@ -11,16 +11,9 @@ import ParticleOverlay, {
   type ParticleEffect,
 } from "@/components/ParticleOverlay"
 import PlayerManager from "@/components/PlayerManager"
-import ThemeManager from "@/components/ThemeManager"
 import SoundtrackManager from "@/components/SoundtrackManager"
 import Chat, { type ChatMessage } from "@/components/Chat"
 import Image from "next/image"
-
-interface Background {
-  id: string
-  name: string
-  backgroundUrl: string
-}
 
 interface Track {
   id: string
@@ -44,11 +37,9 @@ interface RoomClientProps {
   sessionSeatIndex?: number
   sessionShadowColor?: string
   isAdmin: boolean
-  initialBackgroundId: string
-  initialBackground: Background | null
+  initialBackgroundColor: string
   initialSoundtrack: Soundtrack | null
   initialIsLive: boolean
-  backgrounds: Background[]
   soundtracks: Soundtrack[]
   devMode?: boolean
 }
@@ -63,20 +54,16 @@ export default function RoomClient({
   sessionSeatIndex,
   sessionShadowColor,
   isAdmin,
-  initialBackgroundId,
-  initialBackground,
+  initialBackgroundColor,
   initialSoundtrack,
   initialIsLive,
-  backgrounds,
   soundtracks,
   devMode,
 }: RoomClientProps) {
   const router = useRouter()
-  const [currentBackground, setCurrentBackground] = useState<Background | null>(
-    initialBackground,
+  const [currentBackgroundColor, setCurrentBackgroundColor] = useState(
+    initialBackgroundColor,
   )
-  const [currentBackgroundId, setCurrentBackgroundId] =
-    useState(initialBackgroundId)
   const [currentSoundtrack, setCurrentSoundtrack] = useState<Soundtrack | null>(
     initialSoundtrack,
   )
@@ -105,15 +92,13 @@ export default function RoomClient({
     sessionPortraitUrl ?? "",
   )
   const [showPlayerManager, setShowPlayerManager] = useState(false)
-  const [showThemeManager, setShowThemeManager] = useState(false)
   const [showSoundtrackManager, setShowSoundtrackManager] = useState(false)
-  const [backgroundList, setBackgroundList] = useState(backgrounds)
 
   const [currentParticleEffect, setCurrentParticleEffect] =
     useState<ParticleEffect>("none")
 
   const videoRoomApiRef = useRef<{
-    broadcastBackground: (backgroundId: string, background: Background) => void
+    broadcastBackgroundColor: (backgroundColor: string) => void
     broadcastSoundtrack: (
       soundtrackId: string,
       soundtrack: Soundtrack,
@@ -268,27 +253,19 @@ export default function RoomClient({
     setIsLive(false)
   }, [isAdmin])
 
-  async function handleBackgroundBroadcast(backgroundId: string) {
-    const background = backgroundList.find((b) => b.id === backgroundId)
-    if (!background) return
-
+  async function handleBackgroundColorBroadcast(backgroundColor: string) {
     await fetch("/api/room/state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ backgroundId }),
+      body: JSON.stringify({ backgroundColor }),
     })
 
-    videoRoomApiRef.current?.broadcastBackground(backgroundId, background)
-    setCurrentBackgroundId(backgroundId)
-    setCurrentBackground(background)
+    videoRoomApiRef.current?.broadcastBackgroundColor(backgroundColor)
+    setCurrentBackgroundColor(backgroundColor)
   }
 
-  function handleBackgroundReceived(
-    backgroundId: string,
-    background: Background,
-  ) {
-    setCurrentBackgroundId(backgroundId)
-    setCurrentBackground(background)
+  function handleBackgroundColorReceived(backgroundColor: string) {
+    setCurrentBackgroundColor(backgroundColor)
   }
 
   function handleParticleEffectBroadcast(effect: ParticleEffect) {
@@ -394,11 +371,6 @@ export default function RoomClient({
       <header className='flex-none border-b border-stone-800/50 bg-stone-950/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between'>
         <span className='font-serif text-amber-400 text-2xl'>Unity Halls</span>
         <div className='flex items-center gap-4 text-sm text-stone-400'>
-          {currentBackground && (
-            <span className='text-amber-300/70 font-serif'>
-              {currentBackground.name}
-            </span>
-          )}
           {sessionCharacterName && (
             <span className='text-amber-300 font-medium'>
               {sessionCharacterName}
@@ -555,16 +527,10 @@ export default function RoomClient({
 
         {/* Main video area */}
         <div className='flex-1 relative overflow-hidden'>
-          {currentBackground?.backgroundUrl && (
-            <div
-              className='absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out'
-              style={{
-                backgroundImage: `url(${currentBackground.backgroundUrl})`,
-              }}
-            >
-              <div className='absolute inset-0 bg-stone-950/60' />
-            </div>
-          )}
+          <div
+            className='absolute inset-0 transition-colors duration-1000 ease-in-out'
+            style={{ backgroundColor: currentBackgroundColor }}
+          />
 
           <div className='absolute inset-0 z-5 pointer-events-none'>
             <ParticleOverlay effect={currentParticleEffect} />
@@ -587,8 +553,7 @@ export default function RoomClient({
               sessionSeatIndex={sessionSeatIndex}
               sessionShadowColor={isAdmin ? dmShadowColor : playerShadowColor}
               isAdmin={isAdmin}
-              currentBackground={currentBackground}
-              onBackgroundChange={handleBackgroundReceived}
+              onBackgroundColorChange={handleBackgroundColorReceived}
               onSoundtrackChange={handleSoundtrackReceived}
               onParticleEffectChange={handleParticleEffectReceived}
               onVolumeReceived={(v) => {
@@ -611,9 +576,8 @@ export default function RoomClient({
           >
             <div className='w-80 flex-1 min-h-0'>
               <DmPanel
-                backgrounds={backgroundList}
-                currentBackgroundId={currentBackgroundId}
-                onBackgroundSelect={handleBackgroundBroadcast}
+                currentBackgroundColor={currentBackgroundColor}
+                onBackgroundColorChange={handleBackgroundColorBroadcast}
                 soundtracks={soundtrackList}
                 currentSoundtrackId={currentSoundtrack?.id ?? null}
                 onSoundtrackSelect={handleSoundtrackBroadcast}
@@ -645,7 +609,6 @@ export default function RoomClient({
                   setDmCharacterName(profile.characterName)
                 }}
                 onOpenPlayerManager={() => setShowPlayerManager(true)}
-                onOpenBackgroundManager={() => setShowThemeManager(true)}
                 onOpenSoundtrackManager={() => setShowSoundtrackManager(true)}
               />
             </div>
@@ -692,13 +655,6 @@ export default function RoomClient({
 
       {showPlayerManager && (
         <PlayerManager onClose={() => setShowPlayerManager(false)} />
-      )}
-
-      {showThemeManager && (
-        <ThemeManager
-          onClose={() => setShowThemeManager(false)}
-          onBackgroundsChanged={setBackgroundList}
-        />
       )}
 
       {showSoundtrackManager && (

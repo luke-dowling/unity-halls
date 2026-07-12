@@ -6,20 +6,6 @@ import { hash } from "bcryptjs";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const BACKGROUNDS = [
-  {
-    id: "world-map",
-    name: "World Map",
-    backgroundUrl: "https://res.cloudinary.com/dkjzfvfws/image/upload/v1774598171/Parador_Second_Sundering_tdiumi.webp",
-  },
-  { id: "dungeon", name: "Dungeon", backgroundUrl: "https://res.cloudinary.com/dkjzfvfws/image/upload/v1712649570/test190.jpg" },
-  { id: "forest", name: "Forest", backgroundUrl: "" },
-  { id: "castle", name: "Castle", backgroundUrl: "" },
-  { id: "battle", name: "Battle", backgroundUrl: "" },
-  { id: "tavern", name: "Tavern", backgroundUrl: "" },
-  { id: "camp", name: "Camp", backgroundUrl: "" },
-];
-
 const SOUNDTRACKS = [
   { id: "world-map", name: "World Map" },
   { id: "dungeon", name: "Dungeon" },
@@ -66,14 +52,6 @@ async function main() {
     update: { role: "DM" },
   });
 
-  for (const bg of BACKGROUNDS) {
-    await prisma.background.upsert({
-      where: { id: bg.id },
-      create: bg,
-      update: { name: bg.name, backgroundUrl: bg.backgroundUrl },
-    });
-  }
-
   for (const st of SOUNDTRACKS) {
     await prisma.soundtrack.upsert({
       where: { id: st.id },
@@ -100,12 +78,12 @@ async function main() {
 
   await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", backgroundId: "world-map", isLive: false },
+    create: { id: "default", isLive: false },
     update: {},
   });
 
   console.log(`DM account ready: ${dm.email}`);
-  console.log(`Seeded ${BACKGROUNDS.length} backgrounds, ${SOUNDTRACKS.length} soundtracks, ${TRACKS.length} tracks`);
+  console.log(`Seeded ${SOUNDTRACKS.length} soundtracks, ${TRACKS.length} tracks`);
   if (adminPassword === "change-me-now") {
     console.log("⚠  Set SEED_DM_PASSWORD in .env.local before seeding in production!");
   }

@@ -4,10 +4,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const updateSchema = z.object({
-  backgroundId: z.string().min(1).max(50).optional(),
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   soundtrackId: z.string().min(1).max(50).optional(),
-}).refine((d) => d.backgroundId !== undefined || d.soundtrackId !== undefined, {
-  message: "At least one of backgroundId or soundtrackId is required",
+}).refine((d) => d.backgroundColor !== undefined || d.soundtrackId !== undefined, {
+  message: "At least one of backgroundColor or soundtrackId is required",
 });
 
 export async function GET() {
@@ -18,9 +18,9 @@ export async function GET() {
 
   const state = await prisma.roomState.upsert({
     where: { id: "default" },
-    create: { id: "default", backgroundId: "world-map", isLive: false },
+    create: { id: "default", isLive: false },
     update: {},
-    include: { background: true, soundtrack: true },
+    include: { soundtrack: true },
   });
 
   return NextResponse.json(state);
@@ -47,13 +47,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
   }
 
-  if (parsed.data.backgroundId) {
-    const background = await prisma.background.findUnique({ where: { id: parsed.data.backgroundId } });
-    if (!background) {
-      return NextResponse.json({ error: "Background not found" }, { status: 404 });
-    }
-  }
-
   if (parsed.data.soundtrackId) {
     const soundtrack = await prisma.soundtrack.findUnique({ where: { id: parsed.data.soundtrackId } });
     if (!soundtrack) {
@@ -65,7 +58,7 @@ export async function POST(req: Request) {
     where: { id: "default" },
     create: { id: "default", ...parsed.data },
     update: parsed.data,
-    include: { background: true, soundtrack: true },
+    include: { soundtrack: true },
   });
 
   return NextResponse.json(state);

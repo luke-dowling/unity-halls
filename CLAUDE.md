@@ -25,7 +25,7 @@ There are no automated tests. Use `pnpm build` to catch type errors.
 - **Prisma 7** + `@prisma/adapter-pg` (PostgreSQL) — schema: `prisma/schema.prisma`, config: `prisma.config.ts`
 - **NextAuth v5** (beta 30) — credentials provider, JWT strategy
 - **Daily.co** — WebRTC video, max 6 participants
-- **Cloudinary** — portrait + background image hosting
+- **Cloudinary** — portrait + soundtrack audio hosting
 - **Tailwind CSS v4** — PostCSS plugin, CSS-first config in `app/globals.css` (no `tailwind.config.js`)
 - **Zod 4** — imported as `zod`, not `zod/v4`
 
@@ -43,7 +43,6 @@ app/
     daily/{room,token}/   # Daily.co room & token endpoints
     room/{live,state,status}/ # Room state management
     portraits/            # Portrait listing
-    themes/               # Background (theme) CRUD
     soundtracks/          # Soundtrack CRUD
     tracks/               # Individual audio track CRUD
     soundtrack-tracks/    # Join table management (tracks <-> soundtracks)
@@ -55,11 +54,9 @@ app/
 components/
   VideoRoom.tsx           # Main orchestrator (Daily.co call, state, broadcasts)
   VideoTile.tsx           # Per-participant video/portrait tile
-  DmPanel.tsx             # Tabbed DM control panel (scene/music/atmosphere/players/profile)
-  DmControls.tsx          # Inline DM controls (compact variant used in VideoRoom)
+  DmPanel.tsx             # Tabbed DM control panel (background/music/atmosphere/players/profile)
   PlayerControls.tsx      # Player-side controls
   SoundtrackManager.tsx   # DM tool for managing soundtracks + track library
-  ThemeManager.tsx        # DM tool for managing backgrounds
   PlayerManager.tsx       # DM tool for managing player accounts
   Chat.tsx                # In-room chat overlay
   ParticleOverlay.tsx     # Ambient particle effects (snow/rain/embers/fog/night)
@@ -71,12 +68,11 @@ components/
 ## Database Models
 
 - **User** — `Role` (DM/PLAYER), `PlayerClass` enum, `seatIndex` (unique), `portraitUrl`, `shadowColor`
-- **Background** — background images; `id` is a stable slug used as Cloudinary public ID
 - **Soundtrack** — named playlist; has many `SoundtrackTrack` join records
 - **Track** — individual audio file with `url`; reusable across soundtracks
 - **SoundtrackTrack** — join table with `position` ordering; unique on `(soundtrackId, trackId)`
-- **Folder** — hierarchical organizer for backgrounds and soundtracks (`FolderType` enum: BACKGROUND/SOUNDTRACK)
-- **RoomState** — singleton (`id = "default"`); holds `backgroundId`, `soundtrackId`, `isLive`
+- **Folder** — hierarchical organizer for soundtracks (`FolderType` enum: SOUNDTRACK)
+- **RoomState** — singleton (`id = "default"`); holds `backgroundColor` (hex string, DM-editable), `soundtrackId`, `isLive`
 - **ChatMessage** — persisted chat; stores `characterName` + `shadowColor` as snapshot fields
 
 ## Architecture
@@ -97,7 +93,7 @@ All protected routes start with `const session = await auth()` and return 401 if
 | Message type             | Payload                                                |
 | ------------------------ | ------------------------------------------------------ |
 | `IDENTITY`               | User profile fields broadcast on join                  |
-| `BACKGROUND_CHANGE`      | `backgroundId` + full `Background` object              |
+| `BACKGROUND_COLOR_CHANGE`| `backgroundColor` (hex string)                         |
 | `SOUNDTRACK_CHANGE`      | `soundtrackId` + full `Soundtrack` + `startTrackIndex` |
 | `VOLUME_CHANGE`          | `volume` (0–1)                                         |
 | `PARTICLE_EFFECT_CHANGE` | `effect`: snow/rain/embers/fog/night/none              |
@@ -125,7 +121,7 @@ All protected routes start with `const session = await auth()` and return 401 if
 - **Tailwind v4**: All config is CSS-only in `app/globals.css`. Never create `tailwind.config.js`.
 - **Zod v4**: Import from `zod` directly (not `zod/v4`). Some v3 APIs differ.
 - **RoomState singleton**: Always query/update with `id = "default"`.
-- **Background vs Theme**: The data model uses `Background` (not `Theme`). The old `Theme` model no longer exists.
+- **Background is a color, not an image**: The room backdrop is a plain `backgroundColor` hex string on `RoomState`, set by the DM. There is no `Background` model, no background image upload, and no `/api/themes` route.
 
 ## Allowed Actions
 
