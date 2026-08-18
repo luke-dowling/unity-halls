@@ -33,11 +33,10 @@ interface DmPanelProps {
   totalTracks: number
   currentParticleEffect: ParticleEffect
   onParticleEffectSelect: (effect: ParticleEffect) => void
-  name: string
   characterName: string
   shadowColor: string
   onShadowColorChange: (color: string) => void
-  onProfileUpdated: (profile: { name: string; characterName: string }) => void
+  onProfileUpdated: (profile: { characterName: string }) => void
   onOpenPlayerManager: () => void
   onOpenSoundtrackManager: () => void
 }
@@ -57,7 +56,6 @@ export default function DmPanel({
   totalTracks,
   currentParticleEffect,
   onParticleEffectSelect,
-  name: initialName,
   characterName: initialCharacterName,
   shadowColor,
   onShadowColorChange,
@@ -225,7 +223,6 @@ export default function DmPanel({
         )}
         {activeTab === "profile" && (
           <ProfileTab
-            name={initialName}
             characterName={initialCharacterName}
             shadowColor={shadowColor}
             onShadowColorChange={onShadowColorChange}
@@ -621,19 +618,16 @@ function PlayersTab({
 /* ------------------------------------------------------------------ */
 
 function ProfileTab({
-  name: initialName,
   characterName: initialCharacterName,
   shadowColor,
   onShadowColorChange,
   onProfileUpdated,
 }: {
-  name: string
   characterName: string
   shadowColor: string
   onShadowColorChange: (color: string) => void
-  onProfileUpdated: (profile: { name: string; characterName: string }) => void
+  onProfileUpdated: (profile: { characterName: string }) => void
 }) {
-  const [dmName, setDmName] = useState(initialName)
   const [dmCharacterName, setDmCharacterName] = useState(initialCharacterName)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
@@ -641,18 +635,6 @@ function ProfileTab({
 
   return (
     <div className='space-y-4'>
-      <div className='space-y-2'>
-        <label className='block text-xs uppercase tracking-wider text-stone-400'>
-          Name
-        </label>
-        <input
-          type='text'
-          value={dmName}
-          onChange={(e) => setDmName(e.target.value)}
-          className='w-full bg-stone-800 border border-stone-600 rounded-lg px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500'
-        />
-      </div>
-
       <div className='space-y-2'>
         <label className='block text-xs uppercase tracking-wider text-stone-400'>
           Title
@@ -671,15 +653,7 @@ function ProfileTab({
         onClick={async () => {
           setSavingProfile(true)
           setProfileSaved(false)
-          await fetch("/api/users/profile", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: dmName,
-              characterName: dmCharacterName,
-            }),
-          })
-          onProfileUpdated({ name: dmName, characterName: dmCharacterName })
+          await onProfileUpdated({ characterName: dmCharacterName })
           setSavingProfile(false)
           setProfileSaved(true)
           setTimeout(() => setProfileSaved(false), 2000)
