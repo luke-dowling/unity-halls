@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
-import { signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import DailyIframe, {
   DailyCall,
   DailyParticipant,
@@ -75,6 +75,7 @@ type AppMessage =
   | ({ type: "CHAT_MESSAGE" } & ChatMessagePayload)
 
 interface VideoRoomProps {
+  roomId: string
   sessionEmail: string
   sessionName?: string
   sessionCharacterName?: string
@@ -109,6 +110,11 @@ interface VideoRoomProps {
   devMode?: boolean
   musicAudioRef?: React.RefObject<HTMLAudioElement | null>
   musicVolume?: number
+  // Identifies which track is currently loaded into musicAudioRef (e.g.
+  // `${soundtrackId}-${trackIndex}`). The <audio> element remounts on every
+  // track change, so this changing signals the recording graph to
+  // re-subscribe its "playing" listener to the fresh element.
+  musicTrackKey?: string
 }
 
 // An HTMLAudioElement with captureStream() — supported by browsers but not
@@ -122,6 +128,7 @@ const DM_DEFAULT_SHADOW = "#f59e0b"
 const MUSIC_SOURCE_KEY = "__music__"
 const RECORDING_CANVAS_WIDTH = 1280
 const RECORDING_CANVAS_HEIGHT = 720
+const RECORDING_MIC_GAIN = 0.5
 
 const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
   [
@@ -223,6 +230,7 @@ const DEV_MOCK_PARTICIPANTS: [string, ParticipantMeta][] = [
 ]
 
 export default function VideoRoom({
+  roomId,
   sessionName,
   sessionCharacterName,
   sessionPortraitId,
@@ -242,7 +250,9 @@ export default function VideoRoom({
   devMode,
   musicAudioRef,
   musicVolume,
+  musicTrackKey,
 }: VideoRoomProps) {
+  const router = useRouter()
   const callRef = useRef<DailyCall | null>(null)
   const screenVideoRef = useRef<HTMLVideoElement | null>(null)
   const [participants, setParticipants] = useState<
@@ -282,6 +292,7 @@ export default function VideoRoom({
   >(new Map())
   const recordingVideoElsRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const recordingMusicGainRef = useRef<GainNode | null>(null)
+  const recordingMicGainRef = useRef<GainNode | null>(null)
 
   // Sort tiles: DM first (seat 0), then by seatIndex
   const tiles = Array.from(participants.entries()).sort(([, a], [, b]) => {
@@ -569,6 +580,14 @@ export default function VideoRoom({
     const audioMap = recordingAudioSourcesRef.current
     const videoMap = recordingVideoElsRef.current
 
+    let micGain = recordingMicGainRef.current
+    if (!micGain) {
+      micGain = ctx.createGain()
+      micGain.gain.value = RECORDING_MIC_GAIN
+      micGain.connect(dest)
+      recordingMicGainRef.current = micGain
+    }
+
     for (const [sid, meta] of current) {
       const existingAudio = audioMap.get(sid)
       if (meta.audioTrack && existingAudio?.track !== meta.audioTrack) {
@@ -576,7 +595,7 @@ export default function VideoRoom({
         const source = ctx.createMediaStreamSource(
           new MediaStream([meta.audioTrack]),
         )
-        source.connect(dest)
+        source.connect(micGain)
         audioMap.set(sid, { source, track: meta.audioTrack })
       } else if (!meta.audioTrack && existingAudio) {
         existingAudio.source.disconnect()
@@ -661,6 +680,8 @@ export default function VideoRoom({
     recordingAudioSourcesRef.current.clear()
     recordingMusicGainRef.current?.disconnect()
     recordingMusicGainRef.current = null
+    recordingMicGainRef.current?.disconnect()
+    recordingMicGainRef.current = null
     recordingDestRef.current = null
     recordingCanvasRef.current = null
     const ctx = recordingAudioCtxRef.current
@@ -668,6 +689,46 @@ export default function VideoRoom({
     ctx?.close().catch(() => {})
     mediaRecorderRef.current = null
   }
+
+  // (Re)captures the music element's audio into the recording graph. Called
+  // when recording starts, and again whenever the loaded track changes —
+  // captureStream() does not reliably keep producing audio once the
+  // element's underlying resource is swapped out, so a stale capture must be
+  // torn down and replaced rather than reused.
+  const captureMusicSource = useCallback(() => {
+    const ctx = recordingAudioCtxRef.current
+    const dest = recordingDestRef.current
+    if (!ctx || !dest) return
+
+    const existing = recordingAudioSourcesRef.current.get(MUSIC_SOURCE_KEY)
+    if (existing) {
+      existing.source.disconnect()
+      recordingAudioSourcesRef.current.delete(MUSIC_SOURCE_KEY)
+    }
+    recordingMusicGainRef.current?.disconnect()
+    recordingMusicGainRef.current = null
+
+    const musicEl = musicAudioRef?.current as CaptureableAudioElement | null
+    if (!musicEl?.captureStream) return
+    try {
+      const musicTrack = musicEl.captureStream().getAudioTracks()[0]
+      if (!musicTrack) return
+      const source = ctx.createMediaStreamSource(new MediaStream([musicTrack]))
+      // captureStream() ignores the <audio> element's .volume, so the
+      // DM's volume slider needs its own gain node to reach the mix.
+      const gain = ctx.createGain()
+      gain.gain.value = musicVolume ?? musicEl.volume
+      source.connect(gain)
+      gain.connect(dest)
+      recordingMusicGainRef.current = gain
+      recordingAudioSourcesRef.current.set(MUSIC_SOURCE_KEY, {
+        source,
+        track: musicTrack,
+      })
+    } catch (err) {
+      console.error("Could not capture soundtrack audio for recording:", err)
+    }
+  }, [musicAudioRef, musicVolume])
 
   // Records mic + every participant's audio/video + the local soundtrack
   // element, mixed locally via Web Audio + Canvas — independent of what's
@@ -687,30 +748,7 @@ export default function VideoRoom({
     recordingDestRef.current = dest
     ctx.resume().catch(() => {})
 
-    const musicEl = musicAudioRef?.current as CaptureableAudioElement | null
-    if (musicEl?.captureStream) {
-      try {
-        const musicTrack = musicEl.captureStream().getAudioTracks()[0]
-        if (musicTrack) {
-          const source = ctx.createMediaStreamSource(
-            new MediaStream([musicTrack]),
-          )
-          // captureStream() ignores the <audio> element's .volume, so the
-          // DM's volume slider needs its own gain node to reach the mix.
-          const gain = ctx.createGain()
-          gain.gain.value = musicVolume ?? musicEl.volume
-          source.connect(gain)
-          gain.connect(dest)
-          recordingMusicGainRef.current = gain
-          recordingAudioSourcesRef.current.set(MUSIC_SOURCE_KEY, {
-            source,
-            track: musicTrack,
-          })
-        }
-      } catch (err) {
-        console.error("Could not capture soundtrack audio for recording:", err)
-      }
-    }
+    captureMusicSource()
 
     syncRecordingGraph(participantsRef.current)
 
@@ -768,6 +806,23 @@ export default function VideoRoom({
     }
   }, [musicVolume])
 
+  // Re-capture the music element's audio whenever it actually starts playing
+  // a (possibly new) track. The "playing" event only fires once the browser
+  // is genuinely decoding the new resource, so — unlike reacting to the
+  // soundtrack/track-index props changing — this can't race React's own
+  // effect that reloads the <audio> element (or a remount of it), which
+  // would otherwise leave the recording wired to a dead captured stream from
+  // the previous track.
+  useEffect(() => {
+    const el = musicAudioRef?.current
+    if (!el) return
+    const handlePlaying = () => {
+      if (isRecordingRef.current) captureMusicSource()
+    }
+    el.addEventListener("playing", handlePlaying)
+    return () => el.removeEventListener("playing", handlePlaying)
+  }, [musicAudioRef, musicTrackKey, captureMusicSource])
+
   useEffect(() => {
     participantsRef.current = participants
     if (isRecordingRef.current) syncRecordingGraph(participants)
@@ -781,7 +836,7 @@ export default function VideoRoom({
       callRef.current = null
     }
     onLeave?.()
-    signOut({ callbackUrl: "/login" })
+    router.push("/dashboard")
   }
 
   useEffect(() => {
@@ -810,7 +865,7 @@ export default function VideoRoom({
     async function join() {
       setStatus("joining")
       try {
-        const res = await fetch("/api/daily/token")
+        const res = await fetch(`/api/daily/token?roomId=${roomId}`)
         if (!res.ok) throw new Error("Failed to get access token")
         const { token, url } = (await res.json()) as {
           token: string
