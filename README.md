@@ -8,7 +8,7 @@ Unity Halls lets a Dungeon Master host a video room where players join with thei
 
 - **Framework**: [Next.js](https://nextjs.org) 16 (App Router) with React 19
 - **Database**: PostgreSQL via [Prisma](https://www.prisma.io/) ORM
-- **Auth**: [NextAuth v5](https://authjs.dev/) (Credentials / JWT)
+- **Auth**: [NextAuth v5](https://authjs.dev/) (Credentials + Google OAuth / JWT)
 - **Video**: [Daily.co](https://www.daily.co/) (up to 6 participants)
 - **Image Hosting**: [Cloudinary](https://cloudinary.com/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) v4
@@ -29,6 +29,9 @@ Create a `.env` file in the project root:
 DATABASE_URL=postgresql://user:password@localhost:5432/unity_halls
 AUTH_SECRET=<random-secret-for-nextauth>
 
+AUTH_GOOGLE_ID=<your-google-oauth-client-id>
+AUTH_GOOGLE_SECRET=<your-google-oauth-client-secret>
+
 DAILY_API_KEY=<your-daily-api-key>
 DAILY_ROOM_NAME=unity-halls
 
@@ -46,6 +49,8 @@ DEV_MODE=true
 | ------------------ | -------------------------------------------------------------- |
 | `DATABASE_URL`     | PostgreSQL connection string                                   |
 | `AUTH_SECRET`      | Random secret for NextAuth (`npx auth secret` to generate)     |
+| `AUTH_GOOGLE_ID`     | Google OAuth client ID (from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)) |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret                                     |
 | `DAILY_API_KEY`    | API key from your Daily.co dashboard                           |
 | `DAILY_ROOM_NAME`  | Name of the Daily room (defaults to `unity-halls`)             |
 | `CLOUDINARY_*`     | Cloudinary credentials for portrait uploads                    |
