@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
 });
 
@@ -26,7 +26,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const { email, password } = parsed.data;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+        if (!user || !user.passwordHash) return null;
 
         const valid = await compare(password, user.passwordHash);
         if (!valid) return null;
@@ -35,13 +35,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role,
-          characterName: user.characterName ?? undefined,
-          portraitId: user.portraitId ?? undefined,
-          portraitUrl: user.portraitUrl ?? undefined,
-          playerClass: user.playerClass ?? undefined,
-          seatIndex: user.seatIndex ?? undefined,
-          shadowColor: user.shadowColor ?? undefined,
         };
       },
     }),
@@ -50,25 +43,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
-        token.role = (user as { role?: string }).role;
-        token.characterName = (user as { characterName?: string }).characterName;
-        token.portraitId = (user as { portraitId?: string }).portraitId;
-        token.portraitUrl = (user as { portraitUrl?: string }).portraitUrl;
-        token.playerClass = (user as { playerClass?: string }).playerClass;
-        token.seatIndex = (user as { seatIndex?: number }).seatIndex;
-        token.shadowColor = (user as { shadowColor?: string }).shadowColor;
       }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.userId as string;
-      session.user.role = (token.role as string) ?? "PLAYER";
-      session.user.characterName = token.characterName as string | undefined;
-      session.user.portraitId = token.portraitId as string | undefined;
-      session.user.portraitUrl = token.portraitUrl as string | undefined;
-      session.user.playerClass = token.playerClass as string | undefined;
-      session.user.seatIndex = token.seatIndex as number | undefined;
-      session.user.shadowColor = token.shadowColor as string | undefined;
       return session;
     },
   },
@@ -78,27 +57,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 });
 
 declare module "next-auth" {
-  interface User {
-    role?: string;
-    characterName?: string;
-    portraitId?: string;
-    portraitUrl?: string;
-    playerClass?: string;
-    seatIndex?: number;
-    shadowColor?: string;
-  }
   interface Session {
     user: {
       id: string;
       email: string;
       name: string;
-      role: string;
-      characterName?: string;
-      portraitId?: string;
-      portraitUrl?: string;
-      playerClass?: string;
-      seatIndex?: number;
-      shadowColor?: string;
     };
   }
 }
