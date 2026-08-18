@@ -3,10 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-function isDm(session: { user: { role: string } }) {
-  return session.user.role === "DM";
-}
-
 const addSchema = z.object({
   soundtrackId: z.string(),
   trackId: z.string(),
@@ -15,7 +11,7 @@ const addSchema = z.object({
 // POST: add an existing track to a soundtrack
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session || !isDm(session)) {
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -61,7 +57,7 @@ export async function POST(req: Request) {
 // DELETE: remove a track from a soundtrack (does not delete the Track record)
 export async function DELETE(req: Request) {
   const session = await auth();
-  if (!session || !isDm(session)) {
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

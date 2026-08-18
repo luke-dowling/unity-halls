@@ -3,10 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-function isDm(session: { user: { role: string } }) {
-  return session.user.role === "DM";
-}
-
 const createSchema = z.object({
   name: z.string().min(1).max(80),
 });
@@ -53,7 +49,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session || !isDm(session)) {
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -79,7 +75,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   const session = await auth();
-  if (!session || !isDm(session)) {
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -111,7 +107,7 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   const session = await auth();
-  if (!session || !isDm(session)) {
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -126,7 +122,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Soundtrack not found" }, { status: 404 });
   }
 
-  await prisma.roomState.updateMany({
+  await prisma.room.updateMany({
     where: { soundtrackId: id },
     data: { soundtrackId: null },
   });
