@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getRoomAccess } from "@/lib/rooms";
+import { FREE_TIER_WEEKLY_LIMIT_HOURS, getRoomAccess, getRoomWeeklyUsageSeconds } from "@/lib/rooms";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -36,6 +36,36 @@ export async function POST(
   const parsed = liveSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
+  }
+
+  if (parsed.data.isLive) {
+    const owner = await prisma.user.findUnique({
+      where: { id: room.ownerId },
+      select: { planTier: true },
+    });
+
+    if (owner?.planTier !== "PAID") {
+      const usedSeconds = await getRoomWeeklyUsageSeconds(roomId);
+      if (usedSeconds >= FREE_TIER_WEEKLY_LIMIT_HOURS * 3600) {
+        return NextResponse.json(
+          { error: "Weekly session limit reached for this room" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Guard against a dangling open session (e.g. a prior toggle whose
+    // "end" call never landed) before starting a new one.
+    await prisma.roomSession.updateMany({
+      where: { roomId, endedAt: null },
+      data: { endedAt: new Date() },
+    });
+    await prisma.roomSession.create({ data: { roomId } });
+  } else {
+    await prisma.roomSession.updateMany({
+      where: { roomId, endedAt: null },
+      data: { endedAt: new Date() },
+    });
   }
 
   const updated = await prisma.room.update({
