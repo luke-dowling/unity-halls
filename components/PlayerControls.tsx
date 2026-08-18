@@ -4,12 +4,11 @@ import { useState } from "react"
 import Image from "next/image"
 
 interface PlayerControlsProps {
-  name: string
+  roomId: string
   characterName: string
   shadowColor: string
   portraitUrl: string
   onProfileUpdated: (profile: {
-    name: string
     characterName: string
     shadowColor: string
     portraitUrl: string
@@ -17,13 +16,12 @@ interface PlayerControlsProps {
 }
 
 export default function PlayerControls({
-  name: initialName,
+  roomId,
   characterName: initialCharacterName,
   shadowColor: initialShadowColor,
   portraitUrl: initialPortraitUrl,
   onProfileUpdated,
 }: PlayerControlsProps) {
-  const [name, setName] = useState(initialName)
   const [characterName, setCharacterName] = useState(initialCharacterName)
   const [shadowColor, setShadowColor] = useState(initialShadowColor)
   const [portraitUrl, setPortraitUrl] = useState(initialPortraitUrl)
@@ -61,11 +59,10 @@ export default function PlayerControls({
         finalPortraitUrl = uploadData.url as string
       }
 
-      const res = await fetch("/api/users/profile", {
+      const res = await fetch(`/api/rooms/${roomId}/membership`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
           characterName,
           shadowColor,
           portraitUrl: finalPortraitUrl,
@@ -82,7 +79,6 @@ export default function PlayerControls({
       setPortraitUrl(finalPortraitUrl)
       setPortraitFile(null)
       onProfileUpdated({
-        name,
         characterName,
         shadowColor,
         portraitUrl: finalPortraitUrl,
@@ -118,7 +114,7 @@ export default function PlayerControls({
             />
           ) : (
             <div className='w-14 h-14 rounded-full bg-stone-700 border-2 border-stone-600 flex items-center justify-center text-stone-400 text-lg font-serif'>
-              {(characterName || name)?.[0]?.toUpperCase() ?? "?"}
+              {characterName?.[0]?.toUpperCase() ?? "?"}
             </div>
           )}
           <label className='cursor-pointer px-3 py-1.5 text-xs rounded border border-stone-600 text-stone-300 hover:border-amber-700 hover:text-amber-300 transition-colors'>
@@ -131,19 +127,6 @@ export default function PlayerControls({
             />
           </label>
         </div>
-      </div>
-
-      {/* Name */}
-      <div className='space-y-1'>
-        <label className='block text-xs uppercase tracking-wider text-stone-400'>
-          Name
-        </label>
-        <input
-          type='text'
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className='w-full bg-stone-800 border border-stone-600 rounded-lg px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500'
-        />
       </div>
 
       {/* Character Name */}
