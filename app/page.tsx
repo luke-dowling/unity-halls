@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 
 export default async function Home() {
   const session = await auth()
-  if (session) redirect("/room")
+  if (session) redirect("/dashboard")
 
   return (
     <main className='min-h-screen bg-stone-950 text-stone-100 flex flex-col'>
@@ -224,27 +224,35 @@ export default async function Home() {
           Your party is waiting
         </h2>
         <p className='text-stone-400 text-sm max-w-sm mx-auto mb-8'>
-          Request your credentials from your Dungeon Master, then step through the doors.
+          Create an account to run your own game, or sign in to join a friend&apos;s.
         </p>
-        <Link
-          href='/login'
-          className='inline-flex items-center gap-2 rounded-md bg-amber-600 hover:bg-amber-500 text-stone-950 font-semibold text-base px-8 py-3 transition-colors shadow-lg shadow-amber-900/40'
-        >
-          Enter the Hall
-          <svg
-            className='w-4 h-4'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2.5'
-            viewBox='0 0 24 24'
+        <div className='flex items-center justify-center gap-3'>
+          <Link
+            href='/signup'
+            className='inline-flex items-center gap-2 rounded-md bg-amber-600 hover:bg-amber-500 text-stone-950 font-semibold text-base px-8 py-3 transition-colors shadow-lg shadow-amber-900/40'
           >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              d='M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3'
-            />
-          </svg>
-        </Link>
+            Enter the Hall
+            <svg
+              className='w-4 h-4'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='2.5'
+              viewBox='0 0 24 24'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                d='M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3'
+              />
+            </svg>
+          </Link>
+          <Link
+            href='/login'
+            className='inline-flex items-center gap-2 rounded-md border border-stone-700 hover:border-amber-700 text-stone-300 hover:text-amber-300 font-medium text-base px-6 py-3 transition-colors'
+          >
+            Sign in
+          </Link>
+        </div>
       </section>
     </main>
   )
