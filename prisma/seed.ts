@@ -46,11 +46,20 @@ async function main() {
       email: adminEmail,
       name: "Dungeon Master",
       passwordHash,
-      characterName: "The DM",
-      role: "DM",
     },
-    update: { role: "DM" },
+    update: {},
   });
+
+  const ownedRoom = await prisma.room.findFirst({ where: { ownerId: dm.id } });
+  if (!ownedRoom) {
+    await prisma.room.create({
+      data: {
+        name: `${dm.name}'s Game`,
+        ownerId: dm.id,
+        ownerCharacterName: "The DM",
+      },
+    });
+  }
 
   for (const st of SOUNDTRACKS) {
     await prisma.soundtrack.upsert({
@@ -75,12 +84,6 @@ async function main() {
       update: { position: st.position },
     });
   }
-
-  await prisma.roomState.upsert({
-    where: { id: "default" },
-    create: { id: "default", isLive: false },
-    update: {},
-  });
 
   console.log(`DM account ready: ${dm.email}`);
   console.log(`Seeded ${SOUNDTRACKS.length} soundtracks, ${TRACKS.length} tracks`);
