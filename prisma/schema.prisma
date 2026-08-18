@@ -24,11 +24,17 @@ enum MembershipStatus {
   PENDING
 }
 
+enum PlanTier {
+  FREE
+  PAID
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
   passwordHash String?
+  planTier     PlanTier @default(FREE)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -57,6 +63,17 @@ model Room {
 
   memberships  RoomMembership[]
   chatMessages ChatMessage[]
+  sessions     RoomSession[]
+}
+
+model RoomSession {
+  id        String    @id @default(cuid())
+  roomId    String
+  room      Room      @relation(fields: [roomId], references: [id])
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([roomId, startedAt])
 }
 
 model RoomMembership {
