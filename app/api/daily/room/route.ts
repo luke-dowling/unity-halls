@@ -1,16 +1,30 @@
 import { auth } from "@/lib/auth";
 import { getDailyRoom } from "@/lib/daily";
+import { getRoomAccess } from "@/lib/rooms";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const roomId = new URL(req.url).searchParams.get("roomId");
+  if (!roomId) {
+    return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+  }
+
+  const { room, isOwner, membership } = await getRoomAccess(roomId, session.user.id);
+  if (!room) {
+    return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  }
+  if (!isOwner && membership?.status !== "ACTIVE") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
-    const room = await getDailyRoom();
-    return NextResponse.json(room);
+    const dailyRoom = await getDailyRoom(roomId);
+    return NextResponse.json(dailyRoom);
   } catch (err) {
     console.error("[daily/room]", err);
     return NextResponse.json({ error: "Failed to get room" }, { status: 500 });

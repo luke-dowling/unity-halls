@@ -1,19 +1,32 @@
 import { auth } from "@/lib/auth";
 import { getDailyRoom, createDailyToken } from "@/lib/daily";
+import { getRoomAccess } from "@/lib/rooms";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const roomId = new URL(req.url).searchParams.get("roomId");
+  if (!roomId) {
+    return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
+  }
+
+  const { room, isOwner, membership } = await getRoomAccess(roomId, session.user.id);
+  if (!room) {
+    return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  }
+  if (!isOwner && membership?.status !== "ACTIVE") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
-    const room = await getDailyRoom();
-    const isOwner = session.user.role === "DM";
-    const userName = session.user.characterName ?? session.user.name;
-    const token = await createDailyToken(room.name, userName, isOwner);
-    return NextResponse.json({ token, url: room.url });
+    const dailyRoom = await getDailyRoom(roomId);
+    const userName = membership?.characterName ?? session.user.name;
+    const token = await createDailyToken(dailyRoom.name, userName, isOwner);
+    return NextResponse.json({ token, url: dailyRoom.url });
   } catch (err) {
     console.error("[daily/token]", err);
     return NextResponse.json({ error: "Failed to create token" }, { status: 500 });
