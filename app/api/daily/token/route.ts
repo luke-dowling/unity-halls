@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { getDailyRoom, createDailyToken } from "@/lib/daily";
-import { getRoomAccess } from "@/lib/rooms";
+import { prisma } from "@/lib/prisma";
+import { FREE_TIER_WEEKLY_LIMIT_HOURS, getRoomAccess, getRoomWeeklyUsageSeconds } from "@/lib/rooms";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -20,6 +21,25 @@ export async function GET(req: Request) {
   }
   if (!isOwner && membership?.status !== "ACTIVE") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Only gate on starting a new session — if the room is already live,
+  // that session already passed this check, so let the owner rejoin it.
+  if (isOwner && !room.isLive) {
+    const owner = await prisma.user.findUnique({
+      where: { id: room.ownerId },
+      select: { planTier: true },
+    });
+
+    if (owner?.planTier !== "PAID") {
+      const usedSeconds = await getRoomWeeklyUsageSeconds(roomId);
+      if (usedSeconds >= FREE_TIER_WEEKLY_LIMIT_HOURS * 3600) {
+        return NextResponse.json(
+          { error: "Weekly session limit reached for this room" },
+          { status: 403 }
+        );
+      }
+    }
   }
 
   try {
