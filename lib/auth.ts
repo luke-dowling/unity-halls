@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +14,7 @@ const loginSchema = z.object({
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
+    Google,
     Credentials({
       name: "credentials",
       credentials: {
@@ -40,6 +42,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider !== "google") return true;
+      if (!user.email) return false;
+
+      const dbUser = await prisma.user.upsert({
+        where: { email: user.email },
+        update: {},
+        create: {
+          email: user.email,
+          name: user.name ?? user.email,
+        },
+      });
+
+      user.id = dbUser.id;
+      return true;
+    },
     jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
