@@ -15,8 +15,8 @@ export const authConfig: NextAuthConfig = {
       const { pathname } = nextUrl;
 
       const isProtected =
-        pathname.startsWith("/room") || pathname.startsWith("/admin") || pathname.startsWith("/customize");
-      const isAuthPage = pathname.startsWith("/login");
+        pathname.startsWith("/dashboard") || pathname.startsWith("/room") || pathname.startsWith("/invite");
+      const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/signup");
 
       if (isProtected && !isLoggedIn) {
         // NextAuth redirects to the signIn page automatically
@@ -24,7 +24,7 @@ export const authConfig: NextAuthConfig = {
       }
 
       if (isAuthPage && isLoggedIn) {
-        return Response.redirect(new URL("/room", nextUrl));
+        return Response.redirect(new URL("/dashboard", nextUrl));
       }
 
       return true;
