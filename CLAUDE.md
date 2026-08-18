@@ -34,61 +34,69 @@ There are no automated tests. Use `pnpm build` to catch type errors.
 ```
 app/
   (auth)/login/           # Login page (unprotected)
+  (auth)/signup/          # Signup page — creates a User and their owned Room in one transaction
   (protected)/            # Route group requiring auth session
-    admin/                # DM-only dashboard (AdminClient.tsx)
-    room/                 # Video room (RoomClient.tsx)
-    customize/            # Player self-service profile editor (CustomizeClient.tsx)
+    dashboard/            # Landing page: owned room + invite link, active/pending/past memberships
+    invite/[token]/       # Invite-link landing page — request to join a room
+    room/[roomId]/        # Video room (RoomClient.tsx), scoped to one Room
+    room/[roomId]/customize/ # Player self-service profile editor (CustomizeClient.tsx)
   api/
     auth/[...nextauth]/   # NextAuth route handler
+    auth/signup/          # Account creation (also creates the user's Room)
     daily/{room,token}/   # Daily.co room & token endpoints
-    room/{live,state,status}/ # Room state management
+    rooms/                # List rooms the current user owns/belongs to (GET only — no room creation endpoint)
+    rooms/[roomId]/       # Room details; {live,state,status} state management, invite (token regen),
+                           # members (approve/deny/kick), membership (join/leave/rejoin), chat
     portraits/            # Portrait listing
     soundtracks/          # Soundtrack CRUD
     tracks/               # Individual audio track CRUD
     soundtrack-tracks/    # Join table management (tracks <-> soundtracks)
     upload/               # Cloudinary upload (POST)
     upload/sign/          # Cloudinary signed upload params
-    users/                # User CRUD + profile + shadow-color + [id]/portrait
-    chat/                 # Chat message persistence
 
 components/
-  VideoRoom.tsx           # Main orchestrator (Daily.co call, state, broadcasts)
+  VideoRoom.tsx           # Main orchestrator (Daily.co call, state, broadcasts) — one instance per Room
   VideoTile.tsx           # Per-participant video/portrait tile
   DmPanel.tsx             # Tabbed DM control panel (background/music/atmosphere/players/profile)
   PlayerControls.tsx      # Player-side controls
   SoundtrackManager.tsx   # DM tool for managing soundtracks + track library
-  PlayerManager.tsx       # DM tool for managing player accounts
+  RoomMembersPanel.tsx    # DM tool for approving/denying/kicking room members
   Chat.tsx                # In-room chat overlay
   ParticleOverlay.tsx     # Ambient particle effects (snow/rain/embers/fog/night)
   ScreenShareAnnotation.tsx # Draw-on-screen annotation layer
-  PortraitPicker.tsx      # Portrait selection UI
-  UserForm.tsx            # User create/edit form
 ```
 
 ## Database Models
 
-- **User** — `Role` (DM/PLAYER), `PlayerClass` enum, `seatIndex` (unique), `portraitUrl`, `shadowColor`
-- **Soundtrack** — named playlist; has many `SoundtrackTrack` join records
+- **User** — account only (`email`, `name`, `passwordHash`); no longer carries room-specific fields
+- **Room** — one per DM, created automatically at signup (`app/api/auth/signup/route.ts`); holds `ownerId`, `ownerCharacterName`/`ownerPortraitUrl`/`ownerShadowColor` (the owner's DM persona), `backgroundColor`, `soundtrackId`, `isLive`, unique `inviteToken`. There is no endpoint to create additional rooms, so in practice each user owns at most one.
+- **RoomMembership** — join table between `User` and `Room` for players; `MembershipStatus` enum (ACTIVE/LEFT/PENDING), `seatIndex` (unique per room), `characterName`, `playerClass`, `portraitUrl`, `shadowColor`. A player can hold ACTIVE membership in up to `MAX_PLAYER_ROOMS` (3, see `lib/rooms.ts`) rooms at once.
+- **Soundtrack** — named playlist; has many `SoundtrackTrack` join records; referenced by any number of `Room`s
 - **Track** — individual audio file with `url`; reusable across soundtracks
 - **SoundtrackTrack** — join table with `position` ordering; unique on `(soundtrackId, trackId)`
 - **Folder** — hierarchical organizer for soundtracks (`FolderType` enum: SOUNDTRACK)
-- **RoomState** — singleton (`id = "default"`); holds `backgroundColor` (hex string, DM-editable), `soundtrackId`, `isLive`
-- **ChatMessage** — persisted chat; stores `characterName` + `shadowColor` as snapshot fields
+- **ChatMessage** — persisted chat, scoped to a `roomId`; stores `characterName` + `shadowColor` as snapshot fields
 
 ## Architecture
 
+### Multi-Room Model
+
+Each DM's session is its own `Room` row, created automatically in the signup transaction (`app/api/auth/signup/route.ts`) — there is no UI or endpoint to create a second room, so one user account = one owned room. Rooms are fully independent: each has its own `backgroundColor`, `soundtrackId`, `isLive` flag, and its own Daily.co room (`unity-halls-${roomId}`, see `lib/daily.ts`). Any number of different DMs' rooms can be live at the same time with zero shared state. Players join via `/invite/[token]` and can hold ACTIVE membership in up to `MAX_PLAYER_ROOMS` (3) rooms simultaneously, but a DM cannot host more than one room without a second account.
+
+`lib/rooms.ts` — `getRoomAccess(roomId, userId)` (returns `{ room, isOwner, membership }`, the standard authorization check for room-scoped routes), `nextAvailableSeat()`, `countActivePlayerRooms()`.
+
 ### Authentication (Two-file pattern)
 
-- `auth.config.ts` — Edge-safe config (no Node.js imports). Used by middleware for route protection: `/room` and `/admin` require auth; `/login` redirects authenticated users to `/room`.
-- `lib/auth.ts` — Full config: Credentials provider, bcrypt, Prisma lookup. Exports `{ handlers, auth, signIn, signOut }`. Extends JWT/session with `role`, `characterName`, `portraitUrl`, `seatIndex`, `shadowColor`.
+- `auth.config.ts` — Edge-safe config (no Node.js imports). Used by middleware for route protection: `/dashboard`, `/room`, and `/invite` require auth; `/login` and `/signup` redirect authenticated users to `/dashboard`.
+- `lib/auth.ts` — Full config: Credentials provider, bcrypt, Prisma lookup. Exports `{ handlers, auth, signIn, signOut }`.
 
 ### API Routes
 
-All protected routes start with `const session = await auth()` and return 401 if absent. Use `NextResponse.json()`. No client-side imports.
+All protected routes start with `const session = await auth()` and return 401 if absent. Room-scoped routes (`app/api/rooms/[roomId]/...`) additionally call `getRoomAccess()` and return 404 if the room doesn't exist or 403 if the caller is neither the owner nor an active member. Use `NextResponse.json()`. No client-side imports.
 
 ### Video Room (Daily.co)
 
-`VideoRoom.tsx` manages the Daily.co call lifecycle and syncs state to all participants via **app messages**:
+`VideoRoom.tsx` manages the Daily.co call lifecycle for a single `roomId` and syncs state to that room's participants via **app messages** (each room's Daily.co call is a separate namespace, so messages never cross rooms):
 
 | Message type             | Payload                                                |
 | ------------------------ | ------------------------------------------------------ |
@@ -120,8 +128,9 @@ All protected routes start with `const session = await auth()` and return 401 if
 - **Auth edge split**: Never import Prisma or bcrypt in `auth.config.ts` — it runs at the edge.
 - **Tailwind v4**: All config is CSS-only in `app/globals.css`. Never create `tailwind.config.js`.
 - **Zod v4**: Import from `zod` directly (not `zod/v4`). Some v3 APIs differ.
-- **RoomState singleton**: Always query/update with `id = "default"`.
-- **Background is a color, not an image**: The room backdrop is a plain `backgroundColor` hex string on `RoomState`, set by the DM. There is no `Background` model, no background image upload, and no `/api/themes` route.
+- **No `RoomState` singleton**: Room state (`backgroundColor`, `soundtrackId`, `isLive`) lives directly on each `Room` row, not a shared singleton. Always scope queries/updates by `roomId`.
+- **One owned room per user, not enforced by the schema**: `Room.ownerId` has no unique constraint — the "one room per DM" rule is only upheld by there being no room-creation endpoint. Don't add one without deciding how multi-room DMs should work first.
+- **Background is a color, not an image**: The room backdrop is a plain `backgroundColor` hex string on `Room`, set by the DM. There is no `Background` model, no background image upload, and no `/api/themes` route.
 
 ## Allowed Actions
 
