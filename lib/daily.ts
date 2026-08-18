@@ -7,8 +7,8 @@ function dailyHeaders() {
   };
 }
 
-export async function getDailyRoom(): Promise<{ url: string; name: string }> {
-  const roomName = process.env.DAILY_ROOM_NAME ?? "unity-halls";
+export async function getDailyRoom(roomId: string): Promise<{ url: string; name: string }> {
+  const roomName = `unity-halls-${roomId}`;
 
   // Try to fetch existing room first
   const getRes = await fetch(`${DAILY_API_BASE}/rooms/${roomName}`, {
