@@ -6,11 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  DM
-  PLAYER
-}
-
 enum PlayerClass {
   CLERIC
   RANGER
@@ -23,20 +18,62 @@ enum FolderType {
   SOUNDTRACK
 }
 
+enum MembershipStatus {
+  ACTIVE
+  LEFT
+  PENDING
+}
+
 model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
-  name          String
-  passwordHash  String
-  role          Role         @default(PLAYER)
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedRooms   Room[]           @relation("RoomOwner")
+  memberships  RoomMembership[]
+  chatMessages ChatMessage[]
+}
+
+model Room {
+  id              String      @id @default(cuid())
+  name            String
+  ownerId         String
+  owner           User        @relation("RoomOwner", fields: [ownerId], references: [id])
+  backgroundColor String      @default("#0c0a09")
+  soundtrackId    String?
+  soundtrack      Soundtrack? @relation(fields: [soundtrackId], references: [id])
+  isLive          Boolean     @default(false)
+  inviteToken     String      @unique @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  memberships  RoomMembership[]
+  chatMessages ChatMessage[]
+}
+
+model RoomMembership {
+  id            String           @id @default(cuid())
+  userId        String
+  roomId        String
+  status        MembershipStatus @default(ACTIVE)
+  seatIndex     Int?
   characterName String?
   playerClass   PlayerClass?
-  seatIndex     Int?         @unique
   portraitId    String?
   portraitUrl   String?
   shadowColor   String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  joinedAt      DateTime         @default(now())
+  leftAt        DateTime?
+  requestedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@unique([userId, roomId])
+  @@unique([roomId, seatIndex])
 }
 
 model Folder {
@@ -68,27 +105,23 @@ model SoundtrackTrack {
 }
 
 model Soundtrack {
-  id         String            @id @default(cuid())
-  name       String
-  tracks     SoundtrackTrack[]
-  folders    Folder[]          @relation("SoundtrackFolders")
-  roomStates RoomState[]
-}
-
-model RoomState {
-  id              String      @id @default("default")
-  backgroundColor String      @default("#0c0a09")
-  soundtrackId    String?
-  soundtrack      Soundtrack? @relation(fields: [soundtrackId], references: [id])
-  isLive          Boolean     @default(false)
-  updatedAt       DateTime    @updatedAt
+  id      String            @id @default(cuid())
+  name    String
+  tracks  SoundtrackTrack[]
+  folders Folder[]          @relation("SoundtrackFolders")
+  rooms   Room[]
 }
 
 model ChatMessage {
   id            String   @id @default(cuid())
   userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  roomId        String
+  room          Room     @relation(fields: [roomId], references: [id])
   characterName String?
   shadowColor   String?
   content       String
   createdAt     DateTime @default(now())
+
+  @@index([roomId])
 }
