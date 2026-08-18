@@ -38,17 +38,22 @@ model User {
 }
 
 model Room {
-  id              String      @id @default(cuid())
-  name            String
-  ownerId         String
-  owner           User        @relation("RoomOwner", fields: [ownerId], references: [id])
-  backgroundColor String      @default("#0c0a09")
-  soundtrackId    String?
-  soundtrack      Soundtrack? @relation(fields: [soundtrackId], references: [id])
-  isLive          Boolean     @default(false)
-  inviteToken     String      @unique @default(cuid())
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                 String      @id @default(cuid())
+  name               String
+  ownerId            String
+  owner              User        @relation("RoomOwner", fields: [ownerId], references: [id])
+  // The owner's own DM persona for this room — the owner isn't a
+  // RoomMembership row, so their character identity lives here instead.
+  ownerCharacterName String?
+  ownerPortraitUrl   String?
+  ownerShadowColor   String      @default("#f59e0b")
+  backgroundColor    String      @default("#0c0a09")
+  soundtrackId       String?
+  soundtrack         Soundtrack? @relation(fields: [soundtrackId], references: [id])
+  isLive             Boolean     @default(false)
+  inviteToken        String      @unique @default(cuid())
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
   memberships  RoomMembership[]
   chatMessages ChatMessage[]
