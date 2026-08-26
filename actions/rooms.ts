@@ -4,10 +4,10 @@ export const MAX_PLAYER_ROOMS = 3;
 export const MAX_SEATS = 5;
 
 // Weekly quota for FREE-tier room owners; PAID tier is unlimited.
-export const FREE_TIER_WEEKLY_LIMIT_HOURS = 6;
+export const FREE_TIER_WEEKLY_LIMIT_HOURS = 1;
 // Hard cap on any single session, regardless of tier — protects against a
 // session left running accidentally racking up unbounded time.
-export const MAX_SESSION_HOURS = 6;
+export const MAX_SESSION_HOURS = 1;
 
 export async function getRoomAccess(roomId: string, userId: string) {
   const room = await prisma.room.findUnique({ where: { id: roomId } });
