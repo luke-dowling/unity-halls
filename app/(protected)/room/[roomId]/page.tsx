@@ -1,6 +1,6 @@
-import { auth } from "@/lib/auth"
+import { auth } from "@/actions/auth"
 import { redirect, notFound } from "next/navigation"
-import { prisma } from "@/lib/prisma"
+import { prisma } from "@/actions/prisma"
 import RoomClient from "./RoomClient"
 
 const TRACKS_INCLUDE = {
@@ -13,7 +13,10 @@ const TRACKS_INCLUDE = {
 function mapSoundtrack(st: {
   id: string
   name: string
-  tracks: { position: number; track: { id: string; name: string; url: string } }[]
+  tracks: {
+    position: number
+    track: { id: string; name: string; url: string }
+  }[]
 }) {
   return {
     id: st.id,
@@ -58,7 +61,9 @@ export default async function RoomPage({
   })
 
   const soundtracks = rawSoundtracks.map(mapSoundtrack)
-  const initialSoundtrack = room.soundtrack ? mapSoundtrack(room.soundtrack) : null
+  const initialSoundtrack = room.soundtrack
+    ? mapSoundtrack(room.soundtrack)
+    : null
 
   const devMode = process.env.DEV_MODE === "true"
 
@@ -68,15 +73,24 @@ export default async function RoomPage({
       sessionEmail={session.user.email}
       sessionName={session.user.name}
       sessionCharacterName={
-        (isAdmin ? room.ownerCharacterName : membership?.characterName) ?? undefined
+        (isAdmin ? room.ownerCharacterName : membership?.characterName) ??
+        undefined
       }
-      sessionPortraitId={isAdmin ? undefined : membership?.portraitId ?? undefined}
+      sessionPortraitId={
+        isAdmin ? undefined : (membership?.portraitId ?? undefined)
+      }
       sessionPortraitUrl={
         (isAdmin ? room.ownerPortraitUrl : membership?.portraitUrl) ?? undefined
       }
-      sessionPlayerClass={isAdmin ? undefined : membership?.playerClass ?? undefined}
-      sessionSeatIndex={isAdmin ? undefined : membership?.seatIndex ?? undefined}
-      sessionShadowColor={isAdmin ? room.ownerShadowColor : membership?.shadowColor ?? undefined}
+      sessionPlayerClass={
+        isAdmin ? undefined : (membership?.playerClass ?? undefined)
+      }
+      sessionSeatIndex={
+        isAdmin ? undefined : (membership?.seatIndex ?? undefined)
+      }
+      sessionShadowColor={
+        isAdmin ? room.ownerShadowColor : (membership?.shadowColor ?? undefined)
+      }
       isAdmin={isAdmin}
       inviteToken={isAdmin ? room.inviteToken : undefined}
       initialBackgroundColor={room.backgroundColor}

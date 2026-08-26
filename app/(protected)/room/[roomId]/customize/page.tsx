@@ -1,6 +1,6 @@
-import { auth } from "@/lib/auth"
+import { auth } from "@/actions/auth"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
+import { prisma } from "@/actions/prisma"
 import CustomizeClient from "./CustomizeClient"
 
 export default async function CustomizePage({

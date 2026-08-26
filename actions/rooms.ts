@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/actions/prisma";
 
 export const MAX_PLAYER_ROOMS = 3;
 export const MAX_SEATS = 5;

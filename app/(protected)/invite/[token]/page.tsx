@@ -1,7 +1,11 @@
-import { auth } from "@/lib/auth"
+import { auth } from "@/actions/auth"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
-import { MAX_PLAYER_ROOMS, nextAvailableSeat, countActivePlayerRooms } from "@/lib/rooms"
+import { prisma } from "@/actions/prisma"
+import {
+  MAX_PLAYER_ROOMS,
+  nextAvailableSeat,
+  countActivePlayerRooms,
+} from "@/actions/rooms"
 import Link from "next/link"
 
 function InviteMessage({ title, body }: { title: string; body: string }) {
@@ -92,11 +96,21 @@ export default async function InvitePage({
   })
   const seat = nextAvailableSeat(activeSeats.map((m) => m.seatIndex))
   if (seat === null) {
-    return <InviteMessage title='Room is full' body={`"${room.name}" has no open seats right now.`} />
+    return (
+      <InviteMessage
+        title='Room is full'
+        body={`"${room.name}" has no open seats right now.`}
+      />
+    )
   }
 
   await prisma.roomMembership.create({
-    data: { userId: session.user.id, roomId: room.id, status: "ACTIVE", seatIndex: seat },
+    data: {
+      userId: session.user.id,
+      roomId: room.id,
+      status: "ACTIVE",
+      seatIndex: seat,
+    },
   })
 
   redirect(`/room/${room.id}`)

@@ -1,6 +1,6 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { FREE_TIER_WEEKLY_LIMIT_HOURS, getRoomAccess, getRoomWeeklyUsageSeconds } from "@/lib/rooms";
+import { auth } from "@/actions/auth";
+import { prisma } from "@/actions/prisma";
+import { FREE_TIER_WEEKLY_LIMIT_HOURS, getRoomAccess, getRoomWeeklyUsageSeconds } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

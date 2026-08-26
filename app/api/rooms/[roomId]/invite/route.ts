@@ -1,6 +1,6 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getRoomAccess } from "@/lib/rooms";
+import { auth } from "@/actions/auth";
+import { prisma } from "@/actions/prisma";
+import { getRoomAccess } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 

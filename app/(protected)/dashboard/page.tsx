@@ -1,7 +1,7 @@
-import { auth } from "@/lib/auth"
+import { auth } from "@/actions/auth"
 import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
-import { MAX_PLAYER_ROOMS } from "@/lib/rooms"
+import { prisma } from "@/actions/prisma"
+import { MAX_PLAYER_ROOMS } from "@/actions/rooms"
 import DashboardClient from "./DashboardClient"
 
 export default async function DashboardPage() {
@@ -46,8 +46,12 @@ export default async function DashboardPage() {
             }
           : null
       }
-      active={memberships.filter((m) => m.status === "ACTIVE").map(mapMembership)}
-      pending={memberships.filter((m) => m.status === "PENDING").map(mapMembership)}
+      active={memberships
+        .filter((m) => m.status === "ACTIVE")
+        .map(mapMembership)}
+      pending={memberships
+        .filter((m) => m.status === "PENDING")
+        .map(mapMembership)}
       left={memberships.filter((m) => m.status === "LEFT").map(mapMembership)}
     />
   )

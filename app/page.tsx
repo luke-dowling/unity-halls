@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { auth } from "@/actions/auth"
 
 export default async function Home() {
   const session = await auth()
@@ -31,7 +31,10 @@ export default async function Home() {
             >
               {/* Simple d20 / shield crest */}
               <polygon points='20,4 36,14 36,26 20,36 4,26 4,14' />
-              <polygon points='20,10 29,15 29,25 20,30 11,25 11,15' opacity='0.5' />
+              <polygon
+                points='20,10 29,15 29,25 20,30 11,25 11,15'
+                opacity='0.5'
+              />
               <line x1='20' y1='4' x2='20' y2='10' />
               <line x1='36' y1='14' x2='29' y2='15' />
               <line x1='36' y1='26' x2='29' y2='25' />
@@ -134,7 +137,7 @@ export default async function Home() {
               />
             }
             title='Character Portraits'
-            body="Each player uploads their character portrait. It appears as a stylized overlay on their video tile, giving every seat at the table a personality."
+            body='Each player uploads their character portrait. It appears as a stylized overlay on their video tile, giving every seat at the table a personality.'
           />
           <FeatureCard
             icon={
@@ -156,7 +159,7 @@ export default async function Home() {
               />
             }
             title='DM Command'
-            body="The Dungeon Master controls everything — scenes, music, atmosphere, player management — through a dedicated panel, keeping narrators in charge."
+            body='The Dungeon Master controls everything — scenes, music, atmosphere, player management — through a dedicated panel, keeping narrators in charge.'
           />
         </div>
       </section>
@@ -224,7 +227,8 @@ export default async function Home() {
           Your party is waiting
         </h2>
         <p className='text-stone-400 text-sm max-w-sm mx-auto mb-8'>
-          Create an account to run your own game, or sign in to join a friend&apos;s.
+          Create an account to run your own game, or sign in to join a
+          friend&apos;s.
         </p>
         <div className='flex items-center justify-center gap-3'>
           <Link

@@ -1,7 +1,7 @@
-import { auth } from "@/lib/auth";
-import { getDailyRoom, createDailyToken } from "@/lib/daily";
-import { prisma } from "@/lib/prisma";
-import { FREE_TIER_WEEKLY_LIMIT_HOURS, getRoomAccess, getRoomWeeklyUsageSeconds } from "@/lib/rooms";
+import { auth } from "@/actions/auth";
+import { getDailyRoom, createDailyToken } from "@/actions/daily";
+import { prisma } from "@/actions/prisma";
+import { FREE_TIER_WEEKLY_LIMIT_HOURS, getRoomAccess, getRoomWeeklyUsageSeconds } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {

@@ -1,6 +1,6 @@
-import { auth } from "@/lib/auth";
-import { getDailyRoom } from "@/lib/daily";
-import { getRoomAccess } from "@/lib/rooms";
+import { auth } from "@/actions/auth";
+import { getDailyRoom } from "@/actions/daily";
+import { getRoomAccess } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {

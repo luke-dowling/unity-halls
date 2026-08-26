@@ -1,6 +1,6 @@
-import { auth } from "@/lib/auth";
-import { deleteCloudinaryAsset } from "@/lib/cloudinary";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/actions/auth";
+import { deleteCloudinaryAsset } from "@/actions/cloudinary";
+import { prisma } from "@/actions/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

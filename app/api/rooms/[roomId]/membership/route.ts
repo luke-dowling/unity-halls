@@ -1,7 +1,7 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { deleteCloudinaryAsset } from "@/lib/cloudinary";
-import { getRoomAccess } from "@/lib/rooms";
+import { auth } from "@/actions/auth";
+import { prisma } from "@/actions/prisma";
+import { deleteCloudinaryAsset } from "@/actions/cloudinary";
+import { getRoomAccess } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

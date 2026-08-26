@@ -1,5 +1,5 @@
-import { auth } from "@/lib/auth";
-import { cloudinary } from "@/lib/cloudinary";
+import { auth } from "@/actions/auth";
+import { cloudinary } from "@/actions/cloudinary";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {

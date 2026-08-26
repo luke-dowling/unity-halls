@@ -1,5 +1,5 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/actions/auth";
+import { prisma } from "@/actions/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
