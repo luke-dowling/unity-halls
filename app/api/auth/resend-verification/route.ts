@@ -1,16 +1,13 @@
 import { prisma } from "@/actions/prisma"
 import { sendVerificationEmail } from "@/actions/mail"
 import { NextResponse } from "next/server"
-import { hash } from "bcryptjs"
 import { randomBytes } from "node:crypto"
 import { z } from "zod"
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
-const signupSchema = z.object({
+const resendSchema = z.object({
   email: z.email(),
-  name: z.string().min(1).max(80),
-  password: z.string().min(12),
 })
 
 export async function POST(req: Request) {
@@ -21,34 +18,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  const parsed = signupSchema.safeParse(body)
+  const parsed = resendSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
   }
 
-  const { email, name, password } = parsed.data
+  const { email } = parsed.data
+  const genericResponse = NextResponse.json({
+    message: "If an account with that email exists and isn't verified yet, we've sent a new link.",
+  })
 
-  const existing = await prisma.user.findUnique({ where: { email } })
-  if (existing) {
-    return NextResponse.json({ error: "Email already in use" }, { status: 409 })
-  }
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (!user || user.emailVerified) return genericResponse
 
-  const passwordHash = await hash(password, 12)
   const verificationToken = randomBytes(32).toString("hex")
   const verificationTokenExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS)
 
-  const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: { email, name, passwordHash, verificationToken, verificationTokenExpiresAt },
-    })
-    await tx.room.create({
-      data: { name: `${name}'s Game`, ownerId: created.id },
-    })
-    return created
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { verificationToken, verificationTokenExpiresAt },
   })
 
   const verifyUrl = `${new URL(req.url).origin}/verify/${verificationToken}`
   await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl })
 
-  return NextResponse.json({ id: user.id, email: user.email, name: user.name }, { status: 201 })
+  return genericResponse
 }

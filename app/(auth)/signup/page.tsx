@@ -1,176 +1,7 @@
-"use client"
-
-import React, { Suspense, useState } from "react"
-import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import Link from "next/link"
 
-function SignupForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const formData = new FormData(e.currentTarget)
-    const email = formData.get("email") as string
-    const name = formData.get("name") as string
-    const password = formData.get("password") as string
-
-    const res = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name, password }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => null)
-      setError(
-        res.status === 409
-          ? "An account with that email already exists."
-          : data?.error?.formErrors?.[0] ?? "Could not create your account."
-      )
-      setLoading(false)
-      return
-    }
-
-    const result = await signIn("credentials", { email, password, redirect: false })
-    if (result?.error) {
-      setError("Account created — please sign in.")
-      setLoading(false)
-      router.push("/login")
-      return
-    }
-
-    router.push(callbackUrl)
-  }
-
-  return (
-    <div className='w-full max-w-md space-y-2'>
-      <p className='text-stone-400 text-sm text-center mb-6'>
-        Create an account to enter the Hall
-      </p>
-
-      <form
-        onSubmit={handleSubmit}
-        className='bg-stone-900 border border-stone-700 rounded-lg p-8 space-y-6 shadow-xl'
-      >
-        <button
-          type='button'
-          onClick={() => signIn("google", { callbackUrl })}
-          className='w-full flex items-center justify-center gap-3 rounded-md bg-stone-800 hover:bg-stone-700 border border-stone-600 text-stone-100 font-medium py-3 text-base transition-colors'
-        >
-          <svg viewBox='0 0 24 24' className='w-5 h-5' aria-hidden='true'>
-            <path
-              fill='#4285F4'
-              d='M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.54 5.54 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82Z'
-            />
-            <path
-              fill='#34A853'
-              d='M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.11A11.998 11.998 0 0 0 12 24Z'
-            />
-            <path
-              fill='#FBBC05'
-              d='M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28V6.61H1.27A11.998 11.998 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.11Z'
-            />
-            <path
-              fill='#EA4335'
-              d='M12 4.75c1.76 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.61l4 3.11C6.22 6.86 8.87 4.75 12 4.75Z'
-            />
-          </svg>
-          Continue with Google
-        </button>
-
-        <div className='flex items-center gap-3'>
-          <div className='h-px flex-1 bg-stone-700' />
-          <span className='text-xs text-stone-500 uppercase tracking-wider'>or</span>
-          <div className='h-px flex-1 bg-stone-700' />
-        </div>
-
-        <div className='space-y-2'>
-          <label
-            htmlFor='name'
-            className='block text-xs font-medium text-stone-300 uppercase tracking-wider'
-          >
-            Name
-          </label>
-          <input
-            id='name'
-            name='name'
-            type='text'
-            required
-            autoComplete='name'
-            className='w-full rounded-md bg-stone-800 border border-stone-600 text-stone-100 placeholder-stone-500 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent'
-            placeholder='Your name'
-          />
-        </div>
-
-        <div className='space-y-2'>
-          <label
-            htmlFor='email'
-            className='block text-xs font-medium text-stone-300 uppercase tracking-wider'
-          >
-            Email
-          </label>
-          <input
-            id='email'
-            name='email'
-            type='email'
-            required
-            autoComplete='email'
-            className='w-full rounded-md bg-stone-800 border border-stone-600 text-stone-100 placeholder-stone-500 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent'
-            placeholder='you@example.com'
-          />
-        </div>
-
-        <div className='space-y-2'>
-          <label
-            htmlFor='password'
-            className='block text-xs font-medium text-stone-300 uppercase tracking-wider'
-          >
-            Password
-          </label>
-          <input
-            id='password'
-            name='password'
-            type='password'
-            required
-            minLength={8}
-            autoComplete='new-password'
-            className='w-full rounded-md bg-stone-800 border border-stone-600 text-stone-100 placeholder-stone-500 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent'
-            placeholder='At least 8 characters'
-          />
-        </div>
-
-        {error && (
-          <p className='text-red-400 text-sm' role='alert'>
-            {error}
-          </p>
-        )}
-
-        <button
-          type='submit'
-          disabled={loading}
-          className='w-full rounded-md bg-amber-600 hover:bg-amber-500 disabled:bg-stone-700 disabled:text-stone-500 text-stone-950 font-semibold py-3 text-base transition-colors'
-        >
-          {loading ? "Creating account…" : "Create Account"}
-        </button>
-
-        <p className='text-center text-sm text-stone-400'>
-          Already have an account?{" "}
-          <Link href='/login' className='text-amber-400 hover:text-amber-300'>
-            Sign in
-          </Link>
-        </p>
-      </form>
-    </div>
-  )
-}
+import { SignUpForm } from "@/components/SignUpForm"
 
 export default function SignupPage() {
   return (
@@ -194,7 +25,10 @@ export default function SignupPage() {
             strokeLinejoin='round'
           >
             <polygon points='20,4 36,14 36,26 20,36 4,26 4,14' />
-            <polygon points='20,10 29,15 29,25 20,30 11,25 11,15' opacity='0.5' />
+            <polygon
+              points='20,10 29,15 29,25 20,30 11,25 11,15'
+              opacity='0.5'
+            />
             <line x1='20' y1='4' x2='20' y2='10' />
             <line x1='36' y1='14' x2='29' y2='15' />
             <line x1='36' y1='26' x2='29' y2='25' />
@@ -211,9 +45,22 @@ export default function SignupPage() {
 
       {/* Signup form */}
       <div className='flex-1 flex items-center justify-center px-6 py-12'>
-        <Suspense fallback={null}>
-          <SignupForm />
-        </Suspense>
+        <div className='w-full max-w-md space-y-2'>
+          <p className='text-stone-400 text-sm text-center mb-6'>
+            Create an account to enter the Hall
+          </p>
+
+          <Suspense fallback={null}>
+            <SignUpForm />
+          </Suspense>
+
+          <p className='text-center text-sm text-stone-400'>
+            Already have an account?{" "}
+            <Link href='/login' className='text-amber-400 hover:text-amber-300'>
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </main>
   )
