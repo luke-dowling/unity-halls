@@ -48,7 +48,13 @@ export async function POST(req: Request) {
   })
 
   const verifyUrl = `${new URL(req.url).origin}/verify/${verificationToken}`
-  await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl })
+  try {
+    await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl })
+  } catch (err) {
+    // The account is already created — don't fail the request over a flaky
+    // send. The user can retry from the "resend verification email" flow.
+    console.error("Failed to send verification email:", err)
+  }
 
   return NextResponse.json({ id: user.id, email: user.email, name: user.name }, { status: 201 })
 }
