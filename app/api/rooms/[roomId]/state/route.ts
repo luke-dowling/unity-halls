@@ -34,6 +34,12 @@ export async function GET(
     include: { soundtrack: true },
   });
 
+  // inviteToken is owner-only — strip it before returning to a non-owner member.
+  if (!isOwner && state) {
+    const { inviteToken, ...safeState } = state;
+    return NextResponse.json(safeState);
+  }
+
   return NextResponse.json(state);
 }
 

@@ -21,10 +21,17 @@ export async function GET() {
     ? await prisma.roomMembership.count({ where: { roomId: ownedRoom.id, status: "PENDING" } })
     : 0;
 
+  // inviteToken is owner-only; a membership's room is never one the caller
+  // owns, so strip it before returning these rooms to the player.
+  function omitInviteToken(m: (typeof memberships)[number]) {
+    const { inviteToken, ...room } = m.room;
+    return { ...m, room };
+  }
+
   return NextResponse.json({
     ownedRoom: ownedRoom ? { ...ownedRoom, pendingCount } : null,
-    active: memberships.filter((m) => m.status === "ACTIVE"),
-    pending: memberships.filter((m) => m.status === "PENDING"),
-    left: memberships.filter((m) => m.status === "LEFT"),
+    active: memberships.filter((m) => m.status === "ACTIVE").map(omitInviteToken),
+    pending: memberships.filter((m) => m.status === "PENDING").map(omitInviteToken),
+    left: memberships.filter((m) => m.status === "LEFT").map(omitInviteToken),
   });
 }

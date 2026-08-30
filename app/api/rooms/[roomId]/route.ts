@@ -33,5 +33,11 @@ export async function GET(
     include: { soundtrack: { include: TRACKS_INCLUDE }, owner: { select: { id: true, name: true } } },
   });
 
+  // inviteToken is owner-only — strip it before returning to a non-owner member.
+  if (!isOwner && full) {
+    const { inviteToken, ...safe } = full;
+    return NextResponse.json({ ...safe, isOwner });
+  }
+
   return NextResponse.json({ ...full, isOwner });
 }
