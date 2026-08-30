@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto"
 import { z } from "zod"
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const RESEND_COOLDOWN_MS = 60 * 1000
 
 const resendSchema = z.object({
   email: z.email(),
@@ -34,13 +35,27 @@ export async function POST(req: Request) {
   const verificationToken = randomBytes(32).toString("hex")
   const verificationTokenExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS)
 
-  await prisma.user.update({
-    where: { id: user.id },
+  // Throttle re-sends per account without changing the response shape (so the
+  // response still can't be used to probe which emails are registered) —
+  // derive when the last token was issued from its expiry rather than adding
+  // a dedicated column. The check-and-set happens in one conditional update
+  // so concurrent requests can't both pass the cooldown gate.
+  const cooldownCutoff = new Date(Date.now() - (VERIFICATION_TOKEN_TTL_MS - RESEND_COOLDOWN_MS))
+  const { count } = await prisma.user.updateMany({
+    where: {
+      id: user.id,
+      OR: [{ verificationTokenExpiresAt: null }, { verificationTokenExpiresAt: { lte: cooldownCutoff } }],
+    },
     data: { verificationToken, verificationTokenExpiresAt },
   })
+  if (count === 0) return genericResponse
 
   const verifyUrl = `${new URL(req.url).origin}/verify/${verificationToken}`
-  await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl })
+  try {
+    await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl })
+  } catch (err) {
+    console.error("Failed to send verification email:", err)
+  }
 
   return genericResponse
 }
