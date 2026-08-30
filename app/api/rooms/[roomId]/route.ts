@@ -1,6 +1,6 @@
 import { auth } from "@/actions/auth";
 import { prisma } from "@/actions/prisma";
-import { getRoomAccess } from "@/actions/rooms";
+import { getRoomAccess, omitInviteToken } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 
 const TRACKS_INCLUDE = {
@@ -33,10 +33,8 @@ export async function GET(
     include: { soundtrack: { include: TRACKS_INCLUDE }, owner: { select: { id: true, name: true } } },
   });
 
-  // inviteToken is owner-only — strip it before returning to a non-owner member.
   if (!isOwner && full) {
-    const { inviteToken, ...safe } = full;
-    return NextResponse.json({ ...safe, isOwner });
+    return NextResponse.json({ ...omitInviteToken(full), isOwner });
   }
 
   return NextResponse.json({ ...full, isOwner });

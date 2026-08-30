@@ -1,6 +1,6 @@
 import { auth } from "@/actions/auth";
 import { prisma } from "@/actions/prisma";
-import { getRoomAccess } from "@/actions/rooms";
+import { getRoomAccess, omitInviteToken } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -34,10 +34,8 @@ export async function GET(
     include: { soundtrack: true },
   });
 
-  // inviteToken is owner-only — strip it before returning to a non-owner member.
   if (!isOwner && state) {
-    const { inviteToken, ...safeState } = state;
-    return NextResponse.json(safeState);
+    return NextResponse.json(omitInviteToken(state));
   }
 
   return NextResponse.json(state);

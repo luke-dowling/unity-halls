@@ -21,6 +21,13 @@ export async function getRoomAccess(roomId: string, userId: string) {
   return { room, isOwner, membership };
 }
 
+// inviteToken is owner-only — strip it before returning a Room to a non-owner.
+export function omitInviteToken<T extends { inviteToken: unknown }>(room: T): Omit<T, "inviteToken"> {
+  return Object.fromEntries(
+    Object.entries(room).filter(([key]) => key !== "inviteToken")
+  ) as Omit<T, "inviteToken">;
+}
+
 export function nextAvailableSeat(takenSeats: (number | null | undefined)[]): number | null {
   const taken = new Set(takenSeats.filter((s): s is number => s != null));
   for (let seat = 1; seat <= MAX_SEATS; seat++) {

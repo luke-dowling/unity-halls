@@ -1,5 +1,6 @@
 import { auth } from "@/actions/auth";
 import { prisma } from "@/actions/prisma";
+import { omitInviteToken } from "@/actions/rooms";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -21,17 +22,16 @@ export async function GET() {
     ? await prisma.roomMembership.count({ where: { roomId: ownedRoom.id, status: "PENDING" } })
     : 0;
 
-  // inviteToken is owner-only; a membership's room is never one the caller
-  // owns, so strip it before returning these rooms to the player.
-  function omitInviteToken(m: (typeof memberships)[number]) {
-    const { inviteToken, ...room } = m.room;
-    return { ...m, room };
+  // A membership's room is never one the caller owns, so strip the
+  // owner-only inviteToken before returning these rooms to the player.
+  function withSafeRoom(m: (typeof memberships)[number]) {
+    return { ...m, room: omitInviteToken(m.room) };
   }
 
   return NextResponse.json({
     ownedRoom: ownedRoom ? { ...ownedRoom, pendingCount } : null,
-    active: memberships.filter((m) => m.status === "ACTIVE").map(omitInviteToken),
-    pending: memberships.filter((m) => m.status === "PENDING").map(omitInviteToken),
-    left: memberships.filter((m) => m.status === "LEFT").map(omitInviteToken),
+    active: memberships.filter((m) => m.status === "ACTIVE").map(withSafeRoom),
+    pending: memberships.filter((m) => m.status === "PENDING").map(withSafeRoom),
+    left: memberships.filter((m) => m.status === "LEFT").map(withSafeRoom),
   });
 }
