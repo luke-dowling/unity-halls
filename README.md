@@ -74,7 +74,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to get started!
+Open [http://localhost:3000](http://localhost:3000) to get started.
 
 ## Available Scripts
 
