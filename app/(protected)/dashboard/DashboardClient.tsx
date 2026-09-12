@@ -90,6 +90,19 @@ export default function DashboardClient({
 
       <div className='max-w-3xl mx-auto px-6 py-10 space-y-10'>
         {/* Your room */}
+        {!ownedRoom && (
+          <section className='space-y-3'>
+            <h2 className='text-xs uppercase tracking-wider text-stone-500'>
+              Your Room
+            </h2>
+            <div className='bg-stone-900 border border-stone-800 rounded-lg p-5'>
+              <p className='text-sm text-stone-400'>
+                DM access is required to host a game. Reach out if you&apos;d
+                like to run games here.
+              </p>
+            </div>
+          </section>
+        )}
         {ownedRoom && (
           <section className='space-y-3'>
             <h2 className='text-xs uppercase tracking-wider text-stone-500'>

@@ -8,7 +8,11 @@ export default async function DashboardPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
-  const [ownedRoom, memberships] = await Promise.all([
+  const [user, initialOwnedRoom, memberships] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: session.user.id },
+      select: { name: true, isDM: true },
+    }),
     prisma.room.findFirst({ where: { ownerId: session.user.id } }),
     prisma.roomMembership.findMany({
       where: { userId: session.user.id },
@@ -16,6 +20,17 @@ export default async function DashboardPage() {
       orderBy: { joinedAt: "desc" },
     }),
   ])
+
+  // A DM-flagged account with no Room yet (newly granted DM status) gets one
+  // created here, lazily — there is no room-creation endpoint by design, and
+  // this keeps signup from having to know about DM status at all.
+  const ownedRoom =
+    initialOwnedRoom ??
+    (user.isDM
+      ? await prisma.room.create({
+          data: { name: `${user.name}'s Game`, ownerId: session.user.id },
+        })
+      : null)
 
   const pendingCount = ownedRoom
     ? await prisma.roomMembership.count({

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "isDM" BOOLEAN NOT NULL DEFAULT false;

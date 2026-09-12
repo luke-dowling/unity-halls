@@ -37,14 +37,11 @@ export async function POST(req: Request) {
   const verificationToken = randomBytes(32).toString("hex")
   const verificationTokenExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS)
 
-  const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: { email, name, passwordHash, verificationToken, verificationTokenExpiresAt },
-    })
-    await tx.room.create({
-      data: { name: `${name}'s Game`, ownerId: created.id },
-    })
-    return created
+  // Signup no longer creates a Room — every account could otherwise host
+  // (and rack up session costs) by default. A Room is only ever created for
+  // a DM-flagged account, lazily, the first time they load the dashboard.
+  const user = await prisma.user.create({
+    data: { email, name, passwordHash, verificationToken, verificationTokenExpiresAt },
   })
 
   const verifyUrl = `${new URL(req.url).origin}/verify/${verificationToken}`

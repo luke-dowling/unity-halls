@@ -38,6 +38,10 @@ model User {
   verificationToken           String?   @unique
   verificationTokenExpiresAt  DateTime?
   planTier                    PlanTier  @default(FREE)
+  // Gates who can own/start a Room. Not set at signup — granted manually for
+  // now (via db:studio), eventually behind a paywall. Keeps session costs
+  // from accruing on every new signup by default.
+  isDM                        Boolean   @default(false)
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
 

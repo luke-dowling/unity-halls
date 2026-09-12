@@ -92,6 +92,7 @@ async function main() {
       name: "Dungeon Master",
       passwordHash: dmPasswordHash,
       emailVerified: new Date(),
+      isDM: true,
     },
   });
 
