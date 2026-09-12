@@ -45,18 +45,18 @@ SEED_DM_PASSWORD=<dm-password-for-seed>
 DEV_MODE=true
 ```
 
-| Variable           | Description                                                    |
-| ------------------ | -------------------------------------------------------------- |
-| `DATABASE_URL`     | PostgreSQL connection string                                   |
-| `AUTH_SECRET`      | Random secret for NextAuth (`npx auth secret` to generate)     |
+| Variable             | Description                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL connection string                                                                            |
+| `AUTH_SECRET`        | Random secret for NextAuth (`npx auth secret` to generate)                                              |
 | `AUTH_GOOGLE_ID`     | Google OAuth client ID (from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)) |
-| `AUTH_GOOGLE_SECRET` | Google OAuth client secret                                     |
-| `DAILY_API_KEY`    | API key from your Daily.co dashboard                           |
-| `DAILY_ROOM_NAME`  | Name of the Daily room (defaults to `unity-halls`)             |
-| `CLOUDINARY_*`     | Cloudinary credentials for portrait uploads                    |
-| `ADMIN_EMAIL`      | Email for the DM account created by the seed script            |
-| `SEED_DM_PASSWORD` | Password for the seeded DM account                             |
-| `DEV_MODE`         | Set to `true` to use mock participants instead of live cameras |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret                                                                              |
+| `DAILY_API_KEY`      | API key from your Daily.co dashboard                                                                    |
+| `DAILY_ROOM_NAME`    | Name of the Daily room (defaults to `unity-halls`)                                                      |
+| `CLOUDINARY_*`       | Cloudinary credentials for portrait uploads                                                             |
+| `ADMIN_EMAIL`        | Email for the DM account created by the seed script                                                     |
+| `SEED_DM_PASSWORD`   | Password for the seeded DM account                                                                      |
+| `DEV_MODE`           | Set to `true` to use mock participants instead of live cameras                                          |
 
 ## Getting Started
 
@@ -74,7 +74,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to get started.
+Open [http://localhost:3000](http://localhost:3000) to get started!
 
 ## Available Scripts
 
