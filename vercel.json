@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/enforce-session-caps",
-      "schedule": "*/15 * * * *"
-    }
-  ]
-}
+{}
