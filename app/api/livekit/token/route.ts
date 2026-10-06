@@ -1,5 +1,5 @@
 import { auth } from "@/actions/auth";
-import { getDailyRoom, createDailyToken } from "@/actions/daily";
+import { createLiveKitToken, ensureLiveKitRoom, getLiveKitUrl } from "@/actions/livekit";
 import { prisma } from "@/actions/prisma";
 import { FREE_TIER_WEEKLY_LIMIT_HOURS, getRoomAccess, getRoomWeeklyUsageSeconds } from "@/actions/rooms";
 import { NextResponse } from "next/server";
@@ -43,12 +43,20 @@ export async function GET(req: Request) {
   }
 
   try {
-    const dailyRoom = await getDailyRoom(roomId);
-    const userName = membership?.characterName ?? session.user.name;
-    const token = await createDailyToken(dailyRoom.name, userName, isOwner);
-    return NextResponse.json({ token, url: dailyRoom.url });
+    const roomName = await ensureLiveKitRoom(roomId);
+    const name = membership?.characterName ?? session.user.name ?? "Adventurer";
+    const token = await createLiveKitToken({
+      roomName,
+      // Stable per-user identity. LiveKit allows one connection per identity
+      // in a room, so a second tab replaces the first instead of duplicating
+      // the user's tile.
+      identity: session.user.id,
+      name,
+      isOwner,
+    });
+    return NextResponse.json({ token, url: getLiveKitUrl() });
   } catch (err) {
-    console.error("[daily/token]", err);
+    console.error("[livekit/token]", err);
     return NextResponse.json({ error: "Failed to create token" }, { status: 500 });
   }
 }

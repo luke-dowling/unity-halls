@@ -1,0 +1,29 @@
+# LiveKit server config for Unity Halls.
+# API keys are NOT stored here — they come from the LIVEKIT_KEYS environment
+# variable set in docker-compose.yml.
+
+# Signalling / HTTP API. Only reachable from the internet through Caddy (TLS).
+port: 7880
+
+rtc:
+  # ICE over TCP — fallback for players on networks that block UDP.
+  tcp_port: 7881
+  # UDP range for media. Must be open in the Hetzner firewall.
+  port_range_start: 50000
+  port_range_end: 60000
+  # Discover the VPS's public IP via STUN so clients get reachable candidates.
+  use_external_ip: true
+
+turn:
+  # Built-in TURN over UDP for players behind strict NATs.
+  enabled: true
+  udp_port: 3478
+
+room:
+  # Close a room 5 minutes after the last person leaves.
+  empty_timeout: 300
+  # 5 players + 1 DM (the app also sets this per room when creating it).
+  max_participants: 6
+
+logging:
+  level: info

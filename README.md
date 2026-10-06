@@ -9,7 +9,7 @@ Unity Halls lets a Dungeon Master host a video room where players join with thei
 - **Framework**: [Next.js](https://nextjs.org) 16 (App Router) with React 19
 - **Database**: PostgreSQL via [Prisma](https://www.prisma.io/) ORM
 - **Auth**: [NextAuth v5](https://authjs.dev/) (Credentials + Google OAuth / JWT)
-- **Video**: [Daily.co](https://www.daily.co/) (up to 6 participants)
+- **Video**: [LiveKit](https://livekit.io/), self-hosted (up to 6 participants)
 - **Image Hosting**: [Cloudinary](https://cloudinary.com/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) v4
 
@@ -18,7 +18,7 @@ Unity Halls lets a Dungeon Master host a video room where players join with thei
 - **Node.js** 20+
 - **pnpm** (package manager)
 - **PostgreSQL** database
-- **Daily.co** account — for video rooms ([get an API key](https://dashboard.daily.co/))
+- **LiveKit** server — for video rooms. Self-host it with [`deploy/livekit`](deploy/livekit/README.md), or run `livekit-server --dev` locally
 - **Cloudinary** account — for portrait uploads ([sign up](https://cloudinary.com/))
 
 ## Environment Variables
@@ -32,8 +32,9 @@ AUTH_SECRET=<random-secret-for-nextauth>
 AUTH_GOOGLE_ID=<your-google-oauth-client-id>
 AUTH_GOOGLE_SECRET=<your-google-oauth-client-secret>
 
-DAILY_API_KEY=<your-daily-api-key>
-DAILY_ROOM_NAME=unity-halls
+LIVEKIT_URL=wss://livekit.example.com
+LIVEKIT_API_KEY=<your-livekit-api-key>
+LIVEKIT_API_SECRET=<your-livekit-api-secret>
 
 CLOUDINARY_CLOUD_NAME=<your-cloud-name>
 CLOUDINARY_API_KEY=<your-api-key>
@@ -51,8 +52,9 @@ DEV_MODE=true
 | `AUTH_SECRET`        | Random secret for NextAuth (`npx auth secret` to generate)                                              |
 | `AUTH_GOOGLE_ID`     | Google OAuth client ID (from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)) |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret                                                                              |
-| `DAILY_API_KEY`      | API key from your Daily.co dashboard                                                                    |
-| `DAILY_ROOM_NAME`    | Name of the Daily room (defaults to `unity-halls`)                                                      |
+| `LIVEKIT_URL`        | WebSocket URL of your LiveKit server (`wss://…`; `ws://localhost:7880` for local dev)                   |
+| `LIVEKIT_API_KEY`    | LiveKit API key (must match the server's keys)                                                          |
+| `LIVEKIT_API_SECRET` | LiveKit API secret                                                                                      |
 | `CLOUDINARY_*`       | Cloudinary credentials for portrait uploads                                                             |
 | `ADMIN_EMAIL`        | Email for the DM account created by the seed script                                                     |
 | `SEED_DM_PASSWORD`   | Password for the seeded DM account                                                                      |

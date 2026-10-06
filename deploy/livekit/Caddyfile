@@ -1,0 +1,6 @@
+# TLS for LiveKit signalling. Caddy gets and renews a Let's Encrypt
+# certificate for $LIVEKIT_DOMAIN automatically (needs ports 80 + 443 open and
+# a DNS A record pointing the domain at this VPS).
+{$LIVEKIT_DOMAIN} {
+	reverse_proxy localhost:7880
+}
