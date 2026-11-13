@@ -3,6 +3,7 @@ import { sendVerificationEmail } from "@/actions/mail"
 import { NextResponse } from "next/server"
 import { randomBytes } from "node:crypto"
 import { z } from "zod"
+import { clientIp, rateLimit, tooManyRequests } from "@/actions/rate-limit"
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 const RESEND_COOLDOWN_MS = 60 * 1000
@@ -11,7 +12,13 @@ const resendSchema = z.object({
   email: z.email(),
 })
 
+// On top of the per-account cooldown below: cap how many resend requests one address can make, across all emails.
+const RESENDS_PER_IP_PER_HOUR = 10
+
 export async function POST(req: Request) {
+  const limited = rateLimit(`resend:ip:${clientIp(req)}`, RESENDS_PER_IP_PER_HOUR, 60 * 60 * 1000)
+  if (!limited.ok) return tooManyRequests(limited.retryAfterSeconds)
+
   let body: unknown
   try {
     body = await req.json()

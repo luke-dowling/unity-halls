@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { hash } from "bcryptjs"
 import { randomBytes } from "node:crypto"
 import { z } from "zod"
+import { clientIp, rateLimit, tooManyRequests } from "@/actions/rate-limit"
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -13,7 +14,13 @@ const signupSchema = z.object({
   password: z.string().min(12),
 })
 
+// Each signup sends an email (Resend quota) and creates rows: cap how many accounts one address can create.
+const SIGNUPS_PER_IP_PER_HOUR = 5
+
 export async function POST(req: Request) {
+  const limited = rateLimit(`signup:ip:${clientIp(req)}`, SIGNUPS_PER_IP_PER_HOUR, 60 * 60 * 1000)
+  if (!limited.ok) return tooManyRequests(limited.retryAfterSeconds, "Too many sign-ups from your network. Please try again later.")
+
   let body: unknown
   try {
     body = await req.json()
