@@ -87,3 +87,14 @@ Open [http://localhost:3000](http://localhost:3000) to get started.
 | `pnpm db:seed`    | Seed the database              |
 | `pnpm db:studio`  | Open Prisma Studio (DB viewer) |
 | `pnpm lint`       | Run ESLint                     |
+
+## Docker / production
+
+Every push to `main` builds the [`Dockerfile`](Dockerfile) in GitHub Actions and publishes it to `ghcr.io/luke-dowling/unity-halls` (tags `latest` and `sha-<commit>`); pull requests build it without publishing. The Hetzner server runs it from the `unity-halls-infra` repo.
+
+All settings come from the environment at runtime (the same variables as above, with `DEV_MODE` unset). The image has two commands:
+
+```bash
+docker run --env-file .env -p 3000:3000 ghcr.io/luke-dowling/unity-halls   # the app
+docker run --env-file .env ghcr.io/luke-dowling/unity-halls migrate         # prisma migrate deploy, then exit
+```
