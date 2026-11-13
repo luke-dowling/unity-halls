@@ -58,6 +58,12 @@ export const LoginForm = () => {
           unverifiedEmail: email,
         }
       }
+      if (result.code === "rate_limited") {
+        return {
+          message: "Too many login attempts. Please wait 15 minutes and try again.",
+          unverifiedEmail: null,
+        }
+      }
       return { message: "Invalid email or password.", unverifiedEmail: null }
     }
 

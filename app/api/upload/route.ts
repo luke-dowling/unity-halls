@@ -1,11 +1,29 @@
 import { auth } from "@/actions/auth";
+import { rateLimit, tooManyRequests } from "@/actions/rate-limit";
+import { canUploadImages, isDm } from "@/actions/upload-access";
 import { cloudinary } from "@/actions/cloudinary";
 import { NextResponse } from "next/server";
 
+// Uploads are read into memory and sent to Cloudinary, which costs storage and bandwidth: limit who, how much
+// and how often (see actions/upload-access.ts).
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+const UPLOADS_PER_USER_PER_HOUR = 30;
+
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const userId = session.user.id;
+
+  const limited = rateLimit(`upload:user:${userId}`, UPLOADS_PER_USER_PER_HOUR, 60 * 60 * 1000);
+  if (!limited.ok) return tooManyRequests(limited.retryAfterSeconds, "Too many uploads. Please try again later.");
+
+  // Reject oversized bodies before reading them into memory.
+  const declared = Number(req.headers.get("content-length") ?? 0);
+  if (declared > MAX_MEDIA_BYTES + 1024 * 1024) {
+    return NextResponse.json({ error: "File too large (max 50MB)" }, { status: 413 });
   }
 
   const formData = await req.formData();
@@ -35,10 +53,18 @@ export async function POST(req: Request) {
     );
   }
 
-  // 50MB limit
-  if (file.size > 50 * 1024 * 1024) {
+  const isImage = file.type.startsWith("image/");
+  if (isImage ? !(await canUploadImages(userId)) : !(await isDm(userId))) {
     return NextResponse.json(
-      { error: "File too large (max 50MB)" },
+      { error: isImage ? "Join a room before uploading images" : "Only DMs can upload audio or video" },
+      { status: 403 },
+    );
+  }
+
+  const maxBytes = isImage ? MAX_IMAGE_BYTES : MAX_MEDIA_BYTES;
+  if (file.size > maxBytes) {
+    return NextResponse.json(
+      { error: `File too large (max ${maxBytes / 1024 / 1024}MB)` },
       { status: 400 },
     );
   }

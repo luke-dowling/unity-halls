@@ -5,6 +5,7 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/actions/prisma";
 import { authConfig } from "@/auth.config";
+import { clientIp, rateLimit } from "@/actions/rate-limit";
 
 const loginSchema = z.object({
   email: z.email(),
@@ -14,6 +15,16 @@ const loginSchema = z.object({
 class EmailNotVerified extends CredentialsSignin {
   code = "email_not_verified";
 }
+
+class RateLimited extends CredentialsSignin {
+  code = "rate_limited";
+}
+
+// Password guessing: limit attempts per account (slows attacks on one user) and per address (slows one
+// attacker trying many accounts). Counted before the password check, so successful logins count too.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGINS_PER_ACCOUNT = 10;
+const LOGINS_PER_IP = 30;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -25,11 +36,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+
+        const byIp = rateLimit(`login:ip:${clientIp(request)}`, LOGINS_PER_IP, LOGIN_WINDOW_MS);
+        const byAccount = rateLimit(`login:email:${email.toLowerCase()}`, LOGINS_PER_ACCOUNT, LOGIN_WINDOW_MS);
+        if (!byIp.ok || !byAccount.ok) throw new RateLimited();
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.passwordHash) return null;
