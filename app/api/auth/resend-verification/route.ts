@@ -3,6 +3,7 @@ import { sendVerificationEmail } from "@/actions/mail"
 import { NextResponse } from "next/server"
 import { randomBytes } from "node:crypto"
 import { z } from "zod"
+import { publicOrigin } from "@/actions/public-url"
 import { clientIp, rateLimit, tooManyRequests } from "@/actions/rate-limit"
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
   })
   if (count === 0) return genericResponse
 
-  const verifyUrl = `${new URL(req.url).origin}/verify/${verificationToken}`
+  const verifyUrl = `${publicOrigin(req)}/verify/${verificationToken}`
   try {
     await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl })
   } catch (err) {
