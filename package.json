@@ -17,13 +17,15 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@daily-co/daily-js": "^0.89.1",
+    "@livekit/track-processors": "^0.8.1",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
+    "livekit-client": "^2.22.3",
+    "livekit-server-sdk": "^2.19.1",
     "next": "16.2.1",
     "next-auth": "5.0.0-beta.30",
     "react": "19.2.4",

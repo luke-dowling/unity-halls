@@ -1,0 +1,40 @@
+# Self-hosted LiveKit for Unity Halls on a single Hetzner VPS.
+#
+# - livekit: the SFU (media server). Uses host networking because WebRTC
+#   needs a large UDP port range and must see the server's real public IP.
+# - caddy:   terminates TLS for wss://$LIVEKIT_DOMAIN (automatic Let's Encrypt
+#            certificate) and proxies it to LiveKit's signalling port 7880.
+#
+# Usage (see README.md in this folder):
+#   cp livekit.env.example livekit.env   # then fill it in
+#   docker compose --env-file livekit.env up -d
+
+services:
+  livekit:
+    # Pin to a specific release once you've confirmed it works, e.g.
+    # livekit/livekit-server:v1.x.y — see https://github.com/livekit/livekit/releases
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      # "<key>: <secret>" — must match LIVEKIT_API_KEY / LIVEKIT_API_SECRET
+      # in the Next.js app's environment.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  caddy:
+    image: caddy:2
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      LIVEKIT_DOMAIN: "${LIVEKIT_DOMAIN}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
