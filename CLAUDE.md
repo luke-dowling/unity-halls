@@ -76,6 +76,7 @@ components/
 - **SoundtrackTrack** — join table with `position` ordering; unique on `(soundtrackId, trackId)`
 - **Folder** — hierarchical organizer for soundtracks (`FolderType` enum: SOUNDTRACK)
 - **ChatMessage** — persisted chat, scoped to a `roomId`; stores `characterName` + `shadowColor` as snapshot fields
+- **CodexAccess** — one optional row per `User` (`userId` is the PK, cascade delete); `groups` (`"dm"` or campaign slugs) decides what that account may read in the separate Parador codex app, which signs in with Unity Halls accounts and reads only `User` + `CodexAccess` through a read-only DB role. Not used by Unity Halls' own code; rows are added by hand. Don't rename or drop it without updating parador-codex (`site/lib/accounts.ts`).
 
 ## Architecture
 

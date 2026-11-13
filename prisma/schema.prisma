@@ -51,16 +51,16 @@ model User {
   codexAccess  CodexAccess?
 }
 
-// What this user may see in the Parador Codex (a separate app that signs in
-// against this User table). Each group is "dm" (sees everything) or a codex
-// campaign slug whose shared pages the user may read. No row = no access.
+// What this account may read in the Parador codex (a separate app, luke-dowling/parador-codex), which signs
+// people in with their Unity Halls account. The codex only reads this table, through a read-only database role:
+// `SELECT groups FROM "CodexAccess" WHERE "userId" = $1`. Unity Halls itself doesn't use it yet; rows are added by
+// hand (db:studio or SQL). groups: "dm" sees everything; campaign slugs see what's shared with that campaign.
+// No row means no codex access.
 model CodexAccess {
   userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   groups    String[] @default([])
-  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Room {

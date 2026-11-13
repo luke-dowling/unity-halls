@@ -29,6 +29,9 @@ importers:
       cloudinary:
         specifier: ^2.9.0
         version: 2.9.0
+      dotenv:
+        specifier: 16.6.1
+        version: 16.6.1
       livekit-client:
         specifier: ^2.22.3
         version: 2.22.3(@types/dom-mediacapture-record@1.0.22)
