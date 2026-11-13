@@ -70,6 +70,7 @@ async function wipeAllData() {
   await prisma.soundtrack.deleteMany();
   await prisma.track.deleteMany();
   await prisma.folder.deleteMany();
+  await prisma.codexAccess.deleteMany();
   await prisma.user.deleteMany();
 }
 
@@ -93,6 +94,8 @@ async function main() {
       passwordHash: dmPasswordHash,
       emailVerified: new Date(),
       isDM: true,
+      // Full access to the Parador codex, so a local codex can sign in against this database.
+      codexAccess: { create: { groups: ["dm"] } },
     },
   });
 
