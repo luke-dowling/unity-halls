@@ -24,7 +24,7 @@ There are no automated tests. Use `pnpm build` to catch type errors.
 - **TypeScript 5** — path alias `@/` maps to project root
 - **Prisma 7** + `@prisma/adapter-pg` (PostgreSQL) — schema: `prisma/schema.prisma`, config: `prisma.config.ts`
 - **NextAuth v5** (beta 30) — credentials provider, JWT strategy
-- **Daily.co** — WebRTC video, max 6 participants
+- **LiveKit** (`livekit-client`, `livekit-server-sdk`, `@livekit/track-processors`) — self-hosted WebRTC SFU, max 6 participants; server config in `deploy/livekit/`
 - **Cloudinary** — portrait + soundtrack audio hosting
 - **Tailwind CSS v4** — PostCSS plugin, CSS-first config in `app/globals.css` (no `tailwind.config.js`)
 - **Zod 4** — imported as `zod`, not `zod/v4`
@@ -43,7 +43,7 @@ app/
   api/
     auth/[...nextauth]/   # NextAuth route handler
     auth/signup/          # Account creation (also creates the user's Room)
-    daily/{room,token}/   # Daily.co room & token endpoints
+    livekit/token/        # LiveKit access token endpoint (also get-or-creates the LiveKit room)
     rooms/                # List rooms the current user owns/belongs to (GET only — no room creation endpoint)
     rooms/[roomId]/       # Room details; {live,state,status} state management, invite (token regen),
                            # members (approve/deny/kick), membership (join/leave/rejoin), chat
@@ -55,7 +55,7 @@ app/
     upload/sign/          # Cloudinary signed upload params
 
 components/
-  VideoRoom.tsx           # Main orchestrator (Daily.co call, state, broadcasts) — one instance per Room
+  VideoRoom.tsx           # Main orchestrator (LiveKit room, state, broadcasts) — one instance per Room
   VideoTile.tsx           # Per-participant video/portrait tile
   DmPanel.tsx             # Tabbed DM control panel (background/music/atmosphere/players/profile)
   PlayerControls.tsx      # Player-side controls
@@ -81,7 +81,7 @@ components/
 
 ### Multi-Room Model
 
-Each DM's session is its own `Room` row, created automatically in the signup transaction (`app/api/auth/signup/route.ts`) — there is no UI or endpoint to create a second room, so one user account = one owned room. Rooms are fully independent: each has its own `backgroundColor`, `soundtrackId`, `isLive` flag, and its own Daily.co room (`unity-halls-${roomId}`, see `lib/daily.ts`). Any number of different DMs' rooms can be live at the same time with zero shared state. Players join via `/invite/[token]` and can hold ACTIVE membership in up to `MAX_PLAYER_ROOMS` (3) rooms simultaneously, but a DM cannot host more than one room without a second account.
+Each DM's session is its own `Room` row, created automatically in the signup transaction (`app/api/auth/signup/route.ts`) — there is no UI or endpoint to create a second room, so one user account = one owned room. Rooms are fully independent: each has its own `backgroundColor`, `soundtrackId`, `isLive` flag, and its own LiveKit room (`unity-halls-${roomId}`, see `actions/livekit.ts`). Any number of different DMs' rooms can be live at the same time with zero shared state. Players join via `/invite/[token]` and can hold ACTIVE membership in up to `MAX_PLAYER_ROOMS` (3) rooms simultaneously, but a DM cannot host more than one room without a second account.
 
 `lib/rooms.ts` — `getRoomAccess(roomId, userId)` (returns `{ room, isOwner, membership }`, the standard authorization check for room-scoped routes), `nextAvailableSeat()`, `countActivePlayerRooms()`.
 
@@ -94,9 +94,9 @@ Each DM's session is its own `Room` row, created automatically in the signup tra
 
 All protected routes start with `const session = await auth()` and return 401 if absent. Room-scoped routes (`app/api/rooms/[roomId]/...`) additionally call `getRoomAccess()` and return 404 if the room doesn't exist or 403 if the caller is neither the owner nor an active member. Use `NextResponse.json()`. No client-side imports.
 
-### Video Room (Daily.co)
+### Video Room (LiveKit)
 
-`VideoRoom.tsx` manages the Daily.co call lifecycle for a single `roomId` and syncs state to that room's participants via **app messages** (each room's Daily.co call is a separate namespace, so messages never cross rooms):
+`VideoRoom.tsx` manages the LiveKit `Room` lifecycle for a single `roomId` and syncs state to that room's participants via **app messages** — JSON sent with `localParticipant.publishData({ reliable: true })` and received via `RoomEvent.DataReceived` (each LiveKit room is a separate namespace, so messages never cross rooms). Participants are keyed by LiveKit identity (= user id); profile fields arrive via `IDENTITY` and are kept in `remoteIdentitiesRef`. Tiles render raw `MediaStreamTrack`s, so the `Room` is created with `adaptiveStream: false`:
 
 | Message type             | Payload                                                |
 | ------------------------ | ------------------------------------------------------ |
@@ -118,7 +118,7 @@ All protected routes start with `const session = await auth()` and return 401 if
 ### Cloudinary + Prisma Helpers
 
 - `lib/cloudinary.ts` — server-side Cloudinary SDK config
-- `lib/daily.ts` — `getDailyRoom()` (get-or-create), `createDailyToken()`
+- `actions/livekit.ts` — `ensureLiveKitRoom()` (get-or-create, max 6), `createLiveKitToken()`; env: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
 - `lib/prisma.ts` — singleton with global cache to avoid connection exhaustion in dev
 
 ## Pitfalls

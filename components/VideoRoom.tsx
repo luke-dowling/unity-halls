@@ -2,11 +2,17 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import DailyIframe, {
-  DailyCall,
-  DailyParticipant,
-  DailyEventObjectAppMessage,
-} from "@daily-co/daily-js"
+import {
+  ConnectionState,
+  DisconnectReason,
+  Room,
+  RoomEvent,
+  Track as LKTrack,
+  type LocalVideoTrack,
+  type Participant,
+  type RemoteParticipant,
+} from "livekit-client"
+import type { BackgroundProcessorWrapper } from "@livekit/track-processors"
 import VideoTile from "@/components/VideoTile"
 import ScreenShareAnnotation, {
   type Stroke,
@@ -122,6 +128,23 @@ interface VideoRoomProps {
 type CaptureableAudioElement = HTMLAudioElement & {
   captureStream?: () => MediaStream
 }
+
+// The profile fields each participant announces about themselves via the
+// IDENTITY message (LiveKit only knows their identity + display name).
+type IdentityFields = Pick<
+  ParticipantMeta,
+  | "name"
+  | "portraitId"
+  | "portraitUrl"
+  | "characterName"
+  | "playerClass"
+  | "seatIndex"
+  | "isDm"
+  | "shadowColor"
+>
+
+const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
 
 const DEFAULT_SHADOW = "#78716c"
 const DM_DEFAULT_SHADOW = "#f59e0b"
@@ -253,7 +276,46 @@ export default function VideoRoom({
   musicTrackKey,
 }: VideoRoomProps) {
   const router = useRouter()
-  const callRef = useRef<DailyCall | null>(null)
+  const callRef = useRef<Room | null>(null)
+  const blurProcessorRef = useRef<BackgroundProcessorWrapper | null>(null)
+  // Latest IDENTITY payload per remote participant (keyed by LiveKit
+  // identity). Kept in a ref so it survives track/participant refreshes and
+  // isn't lost if an IDENTITY arrives before that participant's tile exists.
+  const remoteIdentitiesRef = useRef<Map<string, IdentityFields>>(new Map())
+  // Local participant's own profile, kept current as props change so
+  // participant refreshes inside the (mount-only) join effect never use
+  // stale values.
+  const localIdentityRef = useRef<IdentityFields>({
+    name: sessionName,
+    portraitId: sessionPortraitId,
+    portraitUrl: sessionPortraitUrl,
+    characterName: sessionCharacterName,
+    playerClass: sessionPlayerClass,
+    seatIndex: sessionSeatIndex,
+    isDm: isAdmin,
+    shadowColor: sessionShadowColor,
+  })
+  useEffect(() => {
+    localIdentityRef.current = {
+      name: sessionName,
+      portraitId: sessionPortraitId,
+      portraitUrl: sessionPortraitUrl,
+      characterName: sessionCharacterName,
+      playerClass: sessionPlayerClass,
+      seatIndex: sessionSeatIndex,
+      isDm: isAdmin,
+      shadowColor: sessionShadowColor,
+    }
+  }, [
+    sessionName,
+    sessionPortraitId,
+    sessionPortraitUrl,
+    sessionCharacterName,
+    sessionPlayerClass,
+    sessionSeatIndex,
+    isAdmin,
+    sessionShadowColor,
+  ])
   const screenVideoRef = useRef<HTMLVideoElement | null>(null)
   const [participants, setParticipants] = useState<
     Map<string, ParticipantMeta>
@@ -350,9 +412,19 @@ export default function VideoRoom({
     setParticipantVolumes((prev) => ({ ...prev, [characterName]: vol }))
   }
 
+  // Sends an app message to everyone else in this room over LiveKit's
+  // reliable data channel (the equivalent of Daily's sendAppMessage).
+  const sendAppMessage = useCallback((msg: AppMessage, room?: Room | null) => {
+    const target = room ?? callRef.current
+    if (!target || target.state !== ConnectionState.Connected) return
+    target.localParticipant
+      .publishData(textEncoder.encode(JSON.stringify(msg)), { reliable: true })
+      .catch((err) => console.error("Failed to send app message:", err))
+  }, [])
+
   const broadcastIdentity = useCallback(
-    (call: DailyCall) => {
-      call.sendAppMessage({
+    (room: Room) => {
+      sendAppMessage({
         type: "IDENTITY",
         name: sessionName,
         portraitId: sessionPortraitId,
@@ -362,9 +434,10 @@ export default function VideoRoom({
         seatIndex: sessionSeatIndex,
         isDm: isAdmin,
         shadowColor: sessionShadowColor,
-      })
+      }, room)
     },
     [
+      sendAppMessage,
       sessionName,
       sessionPortraitId,
       sessionPortraitUrl,
@@ -377,11 +450,11 @@ export default function VideoRoom({
   )
 
   const broadcastBackgroundColor = useCallback((backgroundColor: string) => {
-    callRef.current?.sendAppMessage({
+    sendAppMessage({
       type: "BACKGROUND_COLOR_CHANGE",
       backgroundColor,
     })
-  }, [])
+  }, [sendAppMessage])
 
   const broadcastSoundtrack = useCallback(
     (
@@ -389,37 +462,37 @@ export default function VideoRoom({
       soundtrack: Soundtrack,
       startTrackIndex?: number,
     ) => {
-      callRef.current?.sendAppMessage({
+      sendAppMessage({
         type: "SOUNDTRACK_CHANGE",
         soundtrackId,
         soundtrack,
         startTrackIndex,
       })
     },
-    [],
+    [sendAppMessage],
   )
 
   const broadcastVolume = useCallback((volume: number) => {
-    callRef.current?.sendAppMessage({ type: "VOLUME_CHANGE", volume })
-  }, [])
+    sendAppMessage({ type: "VOLUME_CHANGE", volume })
+  }, [sendAppMessage])
 
   const broadcastParticleEffect = useCallback((effect: ParticleEffect) => {
-    callRef.current?.sendAppMessage({ type: "PARTICLE_EFFECT_CHANGE", effect })
-  }, [])
+    sendAppMessage({ type: "PARTICLE_EFFECT_CHANGE", effect })
+  }, [sendAppMessage])
 
   const broadcastStroke = useCallback((stroke: Stroke) => {
     setStrokes((prev) => [...prev, stroke])
-    callRef.current?.sendAppMessage({ type: "DRAW_STROKE", stroke })
-  }, [])
+    sendAppMessage({ type: "DRAW_STROKE", stroke })
+  }, [sendAppMessage])
 
   const broadcastClear = useCallback(() => {
     setStrokes([])
-    callRef.current?.sendAppMessage({ type: "DRAW_CLEAR" })
-  }, [])
+    sendAppMessage({ type: "DRAW_CLEAR" })
+  }, [sendAppMessage])
 
   const broadcastChatMessage = useCallback((msg: ChatMessagePayload) => {
-    callRef.current?.sendAppMessage({ type: "CHAT_MESSAGE", ...msg })
-  }, [])
+    sendAppMessage({ type: "CHAT_MESSAGE", ...msg })
+  }, [sendAppMessage])
 
   // Expose broadcast helpers to parent via ref
   useEffect(() => {
@@ -441,47 +514,99 @@ export default function VideoRoom({
     broadcastChatMessage,
   ])
 
-  const buildParticipantMeta = (
-    p: DailyParticipant,
-    isLocal: boolean,
-  ): ParticipantMeta => ({
-    videoTrack: p.tracks.video?.persistentTrack ?? null,
-    audioTrack: p.tracks.audio?.persistentTrack ?? null,
-    name: isLocal ? sessionName : undefined,
-    portraitId: isLocal ? sessionPortraitId : undefined,
-    portraitUrl: isLocal ? sessionPortraitUrl : undefined,
-    characterName: isLocal ? sessionCharacterName : (p.user_name ?? undefined),
-    playerClass: isLocal ? sessionPlayerClass : undefined,
-    seatIndex: isLocal ? sessionSeatIndex : undefined,
-    isDm: isLocal ? isAdmin : undefined,
-    shadowColor: isLocal ? sessionShadowColor : undefined,
-    isLocal,
-    isMuted:
-      p.tracks.audio?.state === "off" ||
-      p.tracks.audio?.state === "blocked" ||
-      false,
-    isVideoOff:
-      p.tracks.video?.state === "off" ||
-      p.tracks.video?.state === "blocked" ||
-      false,
-  })
+  // Builds a tile's metadata from a LiveKit participant. Profile fields come
+  // from session props (local) or the participant's last IDENTITY message
+  // (remote), falling back to the display name baked into their token.
+  // Read through refs so this is safe to call from the mount-only join
+  // effect's event handlers.
+  const buildParticipantMeta = (p: Participant): ParticipantMeta => {
+    const isLocal = p.isLocal
+    const camPub = p.getTrackPublication(LKTrack.Source.Camera)
+    const micPub = p.getTrackPublication(LKTrack.Source.Microphone)
+    const camTrack = camPub?.track ?? null
+    // Show the blurred stream on the local tile when blur is on; remote
+    // participants already receive the processed track.
+    const videoTrack =
+      isLocal && camTrack && blurProcessorRef.current?.processedTrack
+        ? blurProcessorRef.current.processedTrack
+        : (camTrack?.mediaStreamTrack ?? null)
+    const identity = isLocal
+      ? localIdentityRef.current
+      : remoteIdentitiesRef.current.get(p.identity)
+    return {
+      videoTrack,
+      audioTrack: micPub?.track?.mediaStreamTrack ?? null,
+      name: identity?.name,
+      portraitId: identity?.portraitId,
+      portraitUrl: identity?.portraitUrl,
+      characterName: identity?.characterName ?? (p.name || undefined),
+      playerClass: identity?.playerClass,
+      seatIndex: identity?.seatIndex,
+      isDm: identity?.isDm,
+      shadowColor: identity?.shadowColor,
+      isLocal,
+      isMuted: !micPub || micPub.isMuted,
+      isVideoOff: !camPub || camPub.isMuted,
+    }
+  }
+
+  // Rebuilds every tile (and the active screen share) from the room's
+  // current participants. Called on any participant/track change — the
+  // LiveKit equivalent of Daily's `participants()` snapshot.
+  const refreshParticipants = (room: Room) => {
+    const all: Participant[] = [
+      room.localParticipant,
+      ...room.remoteParticipants.values(),
+    ]
+    let found: { sessionId: string; track: MediaStreamTrack } | null = null
+    const next = new Map<string, ParticipantMeta>()
+    for (const p of all) {
+      next.set(p.identity, buildParticipantMeta(p))
+      const screenPub = p.getTrackPublication(LKTrack.Source.ScreenShare)
+      if (!found && screenPub?.track && !screenPub.isMuted) {
+        found = { sessionId: p.identity, track: screenPub.track.mediaStreamTrack }
+      }
+    }
+    setParticipants(next)
+    setScreenShare(found)
+    if (!room.localParticipant.isScreenShareEnabled) setIsScreenSharing(false)
+  }
 
   async function toggleBlur() {
-    if (!callRef.current) return
+    const room = callRef.current
+    if (!room) return
+    const camTrack = room.localParticipant.getTrackPublication(
+      LKTrack.Source.Camera,
+    )?.track as LocalVideoTrack | undefined
+    if (!camTrack) return
     const next = !isBlurOn
-    await callRef.current.updateInputSettings({
-      video: {
-        processor: next
-          ? { type: "background-blur", config: { strength: 0.5 } }
-          : { type: "none" },
-      },
-    })
-    setIsBlurOn(next)
+    try {
+      if (next) {
+        const { BackgroundProcessor } = await import(
+          "@livekit/track-processors"
+        )
+        const processor = BackgroundProcessor({
+          mode: "background-blur",
+          blurRadius: 10,
+        })
+        await camTrack.setProcessor(processor)
+        blurProcessorRef.current = processor
+      } else {
+        await camTrack.stopProcessor()
+        blurProcessorRef.current = null
+      }
+      setIsBlurOn(next)
+      refreshParticipants(room)
+    } catch (err) {
+      console.error("Failed to toggle background blur:", err)
+    }
   }
 
   function toggleMic() {
     const newState = !isMicOn
-    if (callRef.current) callRef.current.setLocalAudio(newState)
+    callRef.current?.localParticipant
+      .setMicrophoneEnabled(newState)
+      .catch((err) => console.error("Failed to toggle microphone:", err))
     setIsMicOn(newState)
   }
 
@@ -514,18 +639,23 @@ export default function VideoRoom({
 
   function toggleCam() {
     const newState = !isCamOn
-    if (callRef.current) callRef.current.setLocalVideo(newState)
+    callRef.current?.localParticipant
+      .setCameraEnabled(newState)
+      .catch((err) => console.error("Failed to toggle camera:", err))
     setIsCamOn(newState)
   }
 
-  function toggleScreenShare() {
-    if (!callRef.current) return
+  async function toggleScreenShare() {
+    const room = callRef.current
+    if (!room) return
     if (isScreenSharing) {
-      callRef.current.stopScreenShare()
       setIsScreenSharing(false)
+      await room.localParticipant
+        .setScreenShareEnabled(false)
+        .catch((err) => console.error("Failed to stop screen share:", err))
     } else {
       try {
-        callRef.current.startScreenShare()
+        await room.localParticipant.setScreenShareEnabled(true)
         setIsScreenSharing(true)
       } catch {
         // user cancelled or permission denied
@@ -732,7 +862,7 @@ export default function VideoRoom({
 
   // Records mic + every participant's audio/video + the local soundtrack
   // element, mixed locally via Web Audio + Canvas — independent of what's
-  // actually transmitted over the Daily call, so players never hear the
+  // actually transmitted over the LiveKit call, so players never hear the
   // soundtrack twice.
   function startRecording() {
     if (isRecordingRef.current) return
@@ -831,9 +961,11 @@ export default function VideoRoom({
   async function leaveCall() {
     if (callRef.current) {
       await stopRecording()
-      await callRef.current.leave()
-      callRef.current.destroy()
+      const room = callRef.current
       callRef.current = null
+      await room.disconnect()
+      await blurProcessorRef.current?.destroy().catch(() => {})
+      blurProcessorRef.current = null
     }
     onLeave?.()
     router.push("/dashboard")
@@ -855,175 +987,155 @@ export default function VideoRoom({
     }
 
     if (callRef.current) {
-      callRef.current.destroy()
+      callRef.current.disconnect()
       callRef.current = null
     }
 
     let destroyed = false
-    let call: DailyCall
+    // adaptiveStream stays off: tiles render raw MediaStreamTracks into their
+    // own <video>/<audio> elements rather than via LiveKit's track.attach(),
+    // so LiveKit can't see element visibility and would pause the video.
+    const room = new Room({ adaptiveStream: false, dynacast: true })
+
+    const refresh = () => {
+      if (!destroyed) refreshParticipants(room)
+    }
+
+    // Reads the latest profile from a ref so a mid-session profile edit is
+    // what newcomers receive (this effect only runs once, on mount).
+    const announceIdentity = () => {
+      sendAppMessage({ type: "IDENTITY", ...localIdentityRef.current }, room)
+    }
+
+    const handleAppMessage = (msg: AppMessage, fromId: string) => {
+      if (msg.type === "IDENTITY") {
+        remoteIdentitiesRef.current.set(fromId, {
+          name: msg.name,
+          portraitId: msg.portraitId,
+          portraitUrl: msg.portraitUrl,
+          characterName: msg.characterName,
+          playerClass: msg.playerClass,
+          seatIndex: msg.seatIndex,
+          isDm: msg.isDm,
+          shadowColor: msg.shadowColor,
+        })
+        refresh()
+      } else if (msg.type === "BACKGROUND_COLOR_CHANGE") {
+        onBackgroundColorChange?.(msg.backgroundColor)
+      } else if (msg.type === "SOUNDTRACK_CHANGE") {
+        onSoundtrackChange?.(
+          msg.soundtrackId,
+          msg.soundtrack,
+          msg.startTrackIndex,
+        )
+      } else if (msg.type === "VOLUME_CHANGE") {
+        onVolumeReceived?.(msg.volume)
+      } else if (msg.type === "PARTICLE_EFFECT_CHANGE") {
+        onParticleEffectChange?.(msg.effect)
+      } else if (msg.type === "DRAW_STROKE") {
+        setStrokes((prev) => [...prev, msg.stroke])
+      } else if (msg.type === "DRAW_CLEAR") {
+        setStrokes([])
+      } else if (msg.type === "CHAT_MESSAGE") {
+        onChatMessage?.({
+          id: msg.id,
+          characterName: msg.characterName,
+          shadowColor: msg.shadowColor,
+          content: msg.content,
+          createdAt: msg.createdAt,
+        })
+      }
+    }
+
+    room
+      .on(RoomEvent.ParticipantConnected, () => {
+        // Introduce ourselves to the newcomer (Daily: participant-joined).
+        announceIdentity()
+        refresh()
+      })
+      .on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
+        remoteIdentitiesRef.current.delete(p.identity)
+        refresh()
+      })
+      .on(RoomEvent.TrackPublished, refresh)
+      .on(RoomEvent.TrackUnpublished, refresh)
+      .on(RoomEvent.TrackSubscribed, refresh)
+      .on(RoomEvent.TrackUnsubscribed, refresh)
+      .on(RoomEvent.TrackMuted, refresh)
+      .on(RoomEvent.TrackUnmuted, refresh)
+      .on(RoomEvent.LocalTrackPublished, refresh)
+      .on(RoomEvent.LocalTrackUnpublished, refresh)
+      .on(RoomEvent.ParticipantNameChanged, refresh)
+      .on(RoomEvent.Reconnected, () => {
+        announceIdentity()
+        refresh()
+      })
+      .on(RoomEvent.DataReceived, (payload, participant) => {
+        if (!participant) return
+        let msg: AppMessage
+        try {
+          msg = JSON.parse(textDecoder.decode(payload)) as AppMessage
+        } catch {
+          return
+        }
+        handleAppMessage(msg, participant.identity)
+      })
+      .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+        if (destroyed || reason === DisconnectReason.CLIENT_INITIATED) return
+        console.error("LiveKit disconnected:", reason)
+        setErrorMsg(
+          reason === DisconnectReason.DUPLICATE_IDENTITY
+            ? "You joined this hall from another tab or device."
+            : "A connection error occurred.",
+        )
+        setStatus("error")
+      })
 
     async function join() {
       setStatus("joining")
       try {
-        const res = await fetch(`/api/daily/token?roomId=${roomId}`)
+        const res = await fetch(`/api/livekit/token?roomId=${roomId}`)
         if (!res.ok) throw new Error("Failed to get access token")
         const { token, url } = (await res.json()) as {
           token: string
           url: string
         }
+        if (destroyed) return
 
-        call = DailyIframe.createCallObject({
-          audioSource: true,
-          videoSource: true,
-        })
+        callRef.current = room
+        await room.connect(url, token)
         if (destroyed) {
-          call.destroy()
+          room.disconnect()
           return
         }
-        callRef.current = call
 
-        call.on("joined-meeting", (evt) => {
-          if (!evt) return
-          setStatus("joined")
-          setSupportsBlur(
-            DailyIframe.supportedBrowser().supportsVideoProcessing ?? false,
-          )
+        setStatus("joined")
+        if (isAdmin) onDmJoined?.()
+        refresh()
+        announceIdentity()
 
-          if (isAdmin) onDmJoined?.()
-
-          const map = new Map<string, ParticipantMeta>()
-          const all = call.participants()
-          for (const [sid, p] of Object.entries(all)) {
-            map.set(sid, buildParticipantMeta(p, p.local))
-          }
-          setParticipants(new Map(map))
-          broadcastIdentity(call)
-        })
-
-        call.on("participant-joined", () => {
-          broadcastIdentity(call)
-          const all = call.participants()
-          setParticipants(
-            new Map(
-              Object.entries(all).map(([sid, p]) => [
-                sid,
-                buildParticipantMeta(p, p.local),
-              ]),
-            ),
-          )
-        })
-
-        call.on("participant-updated", () => {
-          const all = call.participants()
-          // Detect active screen share
-          let found: { sessionId: string; track: MediaStreamTrack } | null =
-            null
-          for (const [sid, p] of Object.entries(all)) {
-            const t = p.tracks.screenVideo
-            if (t?.state === "playable" && t.persistentTrack) {
-              found = { sessionId: sid, track: t.persistentTrack }
-              break
-            }
-          }
-          setScreenShare(found)
-          if (!found) setIsScreenSharing(false)
-          setParticipants((prev) => {
-            const next = new Map<string, ParticipantMeta>()
-            for (const [sid, p] of Object.entries(all)) {
-              const existing = prev.get(sid)
-              next.set(sid, {
-                ...buildParticipantMeta(p, p.local),
-                name: p.local ? sessionName : existing?.name,
-                portraitId: existing?.portraitId,
-                portraitUrl: p.local
-                  ? sessionPortraitUrl
-                  : existing?.portraitUrl,
-                characterName: p.local
-                  ? sessionCharacterName
-                  : (existing?.characterName ?? p.user_name ?? undefined),
-                playerClass: p.local
-                  ? sessionPlayerClass
-                  : existing?.playerClass,
-                seatIndex: p.local ? sessionSeatIndex : existing?.seatIndex,
-                isDm: p.local ? isAdmin : existing?.isDm,
-                shadowColor: p.local
-                  ? sessionShadowColor
-                  : existing?.shadowColor,
-              })
-            }
-            return next
+        import("@livekit/track-processors")
+          .then(({ supportsBackgroundProcessors }) => {
+            if (!destroyed) setSupportsBlur(supportsBackgroundProcessors())
           })
-        })
+          .catch(() => {})
 
-        call.on("participant-left", (evt) => {
-          if (!evt) return
-          setParticipants((prev) => {
-            const next = new Map(prev)
-            next.delete(evt.participant.session_id)
-            return next
-          })
-          setScreenShare((prev) =>
-            prev?.sessionId === evt.participant.session_id ? null : prev,
-          )
-        })
-
-        call.on("app-message", (evt: DailyEventObjectAppMessage) => {
-          const msg = evt.data as AppMessage
-          const fromId = evt.fromId
-          if (msg.type === "IDENTITY") {
-            setParticipants((prev) => {
-              const next = new Map(prev)
-              const entry = next.get(fromId)
-              if (entry) {
-                next.set(fromId, {
-                  ...entry,
-                  name: msg.name,
-                  portraitId: msg.portraitId,
-                  portraitUrl: msg.portraitUrl,
-                  characterName: msg.characterName,
-                  playerClass: msg.playerClass,
-                  seatIndex: msg.seatIndex,
-                  isDm: msg.isDm,
-                  shadowColor: msg.shadowColor,
-                })
-              }
-              return next
-            })
-          } else if (msg.type === "BACKGROUND_COLOR_CHANGE") {
-            onBackgroundColorChange?.(msg.backgroundColor)
-          } else if (msg.type === "SOUNDTRACK_CHANGE") {
-            onSoundtrackChange?.(
-              msg.soundtrackId,
-              msg.soundtrack,
-              msg.startTrackIndex,
-            )
-          } else if (msg.type === "VOLUME_CHANGE") {
-            onVolumeReceived?.(msg.volume)
-          } else if (msg.type === "PARTICLE_EFFECT_CHANGE") {
-            onParticleEffectChange?.(msg.effect)
-          } else if (msg.type === "DRAW_STROKE") {
-            setStrokes((prev) => [...prev, msg.stroke])
-          } else if (msg.type === "DRAW_CLEAR") {
-            setStrokes([])
-          } else if (msg.type === "CHAT_MESSAGE") {
-            onChatMessage?.({
-              id: msg.id,
-              characterName: msg.characterName,
-              shadowColor: msg.shadowColor,
-              content: msg.content,
-              createdAt: msg.createdAt,
-            })
-          }
-        })
-
-        call.on("error", (evt) => {
-          console.error("Daily error:", evt)
-          setErrorMsg("A connection error occurred.")
-          setStatus("error")
-        })
-
-        await call.join({ url, token })
+        // Publish mic + camera. A denied or missing device shouldn't stop
+        // the user joining (Daily joined with a "blocked" track instead),
+        // so each is enabled independently and failures just flip the
+        // matching control off.
+        await Promise.all([
+          room.localParticipant.setMicrophoneEnabled(true).catch((err) => {
+            console.warn("Microphone unavailable:", err)
+            if (!destroyed) setIsMicOn(false)
+          }),
+          room.localParticipant.setCameraEnabled(true).catch((err) => {
+            console.warn("Camera unavailable:", err)
+            if (!destroyed) setIsCamOn(false)
+          }),
+        ])
       } catch (err) {
+        if (destroyed) return
         console.error("Failed to join:", err)
         setErrorMsg("Could not connect to the video room.")
         setStatus("error")
@@ -1034,8 +1146,10 @@ export default function VideoRoom({
 
     return () => {
       destroyed = true
-      call?.leave().then(() => call?.destroy())
-      callRef.current = null
+      room.disconnect()
+      if (callRef.current === room) callRef.current = null
+      blurProcessorRef.current?.destroy().catch(() => {})
+      blurProcessorRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
