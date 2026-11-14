@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Unity Halls",
   description: "Themed TTRPG video room",
+  icons: "/hall-icon.png",
 }
 
 export default function RootLayout({
