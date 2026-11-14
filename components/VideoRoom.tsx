@@ -8,6 +8,7 @@ import {
   Room,
   RoomEvent,
   Track as LKTrack,
+  VideoPresets,
   type LocalVideoTrack,
   type Participant,
   type RemoteParticipant,
@@ -777,22 +778,27 @@ export default function VideoRoom({
     ctx2d.fillStyle = "#0c0a09"
     ctx2d.fillRect(0, 0, canvas.width, canvas.height)
 
+    // Each participant gets the largest 16:9 box that fits its cell, centred,
+    // so video is never stretched whatever the participant count.
+    const tileW = Math.min(cellW, (cellH * 16) / 9)
+    const tileH = (tileW * 9) / 16
+
     entries.forEach(([sid, meta], i) => {
-      const x = (i % cols) * cellW
-      const y = Math.floor(i / cols) * cellH
+      const x = (i % cols) * cellW + (cellW - tileW) / 2
+      const y = Math.floor(i / cols) * cellH + (cellH - tileH) / 2
       const videoEl = recordingVideoElsRef.current.get(sid)
       if (videoEl && meta.videoTrack && videoEl.readyState >= 2) {
-        ctx2d.drawImage(videoEl, x, y, cellW, cellH)
+        ctx2d.drawImage(videoEl, x, y, tileW, tileH)
       } else {
         ctx2d.fillStyle = meta.shadowColor ?? "#44403c"
-        ctx2d.fillRect(x, y, cellW, cellH)
+        ctx2d.fillRect(x, y, tileW, tileH)
       }
       ctx2d.strokeStyle = "#1c1917"
       ctx2d.lineWidth = 2
-      ctx2d.strokeRect(x, y, cellW, cellH)
+      ctx2d.strokeRect(x, y, tileW, tileH)
       ctx2d.fillStyle = "#fbbf24"
       ctx2d.font = "bold 18px sans-serif"
-      ctx2d.fillText(meta.characterName || meta.name || "Unknown", x + 10, y + cellH - 14)
+      ctx2d.fillText(meta.characterName || meta.name || "Unknown", x + 10, y + tileH - 14)
     })
 
     recordingRafRef.current = requestAnimationFrame(drawRecordingFrame)
@@ -995,7 +1001,15 @@ export default function VideoRoom({
     // adaptiveStream stays off: tiles render raw MediaStreamTracks into their
     // own <video>/<audio> elements rather than via LiveKit's track.attach(),
     // so LiveKit can't see element visibility and would pause the video.
-    const room = new Room({ adaptiveStream: false, dynacast: true })
+    // Every camera is asked for 16:9 (1280x720) so all tiles receive the same
+    // shape; tiles are also locked to 16:9 in VideoTile.
+    const room = new Room({
+      adaptiveStream: false,
+      dynacast: true,
+      videoCaptureDefaults: {
+        resolution: VideoPresets.h720.resolution,
+      },
+    })
 
     const refresh = () => {
       if (!destroyed) refreshParticipants(room)
