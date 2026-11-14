@@ -121,12 +121,24 @@ export default function VideoTile({
     el.volume = volume
   }
 
-  return (
-    <div className={`relative w-full group ${fill ? "h-full" : ""}`}>
-      {/* Video frame — rectangular with rounded edges */}
+  const tile = (
+    <div
+      className={`relative group ${fill ? "" : "w-full"}`}
+      style={
+        fill
+          ? {
+              // Largest 16:9 box that fits the parent cell (a size container),
+              // so the tile only scales and never changes shape or crop.
+              width: "min(100cqw, calc(100cqh * 16 / 9))",
+              aspectRatio: "16 / 9",
+            }
+          : undefined
+      }
+    >
+      {/* Video frame — always 16:9, rectangular with rounded edges */}
       <div
         ref={frameRef}
-        className={`relative overflow-hidden border border-stone-700 bg-stone-900 rounded-2xl ${fill ? "h-full" : "aspect-[4/3]"}`}
+        className={`relative overflow-hidden border border-stone-700 bg-stone-900 rounded-2xl ${fill ? "h-full" : "aspect-video"}`}
         style={{ boxShadow: `0 0 18px 4px ${shadowColor}99` }}
       >
         {/* Video */}
@@ -289,6 +301,19 @@ export default function VideoTile({
           </div>
         )}
       </div>
+    </div>
+  )
+
+  if (!fill) return tile
+
+  // Fill mode: this wrapper takes the whole grid cell and centres the 16:9
+  // tile inside it; any leftover space shows the room background.
+  return (
+    <div
+      className='w-full h-full flex items-center justify-center'
+      style={{ containerType: "size" }}
+    >
+      {tile}
     </div>
   )
 }
